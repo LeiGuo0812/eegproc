@@ -1,0 +1,5 @@
+# Run from the project root: python -m pip install -r requirements-dev.txt
+# Development tools plus every optional backend exercised by the full test suite.
+# For only the tools and standard backend, use: python -m pip install ".[dev]"
+# Full-backend tests require Python >=3.12 through EEGPrep; prefer Python 3.12.
+.[dev,eegprep,autoreject,device]

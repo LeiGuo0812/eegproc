@@ -1,0 +1,38 @@
+{
+  "upstream": "https://github.com/sccn/eegprep",
+  "version": "0.4.0",
+  "license": "BSD-2-Clause; moving_average retains its embedded MIT notice",
+  "source_files": {
+    "plugins/clean_rawdata/private/stats.py": {
+      "sha256": "bf08fb31a2e0141e7f7a12a861f1494e7204a52771666f21ed178e6d392ca22e"
+    },
+    "plugins/clean_rawdata/private/sigproc.py": {
+      "sha256": "848f380824099a8c38d871beb3941d00921d41c13fae32b693cdf59b56b19e6c"
+    },
+    "plugins/clean_rawdata/private/yulewalk.py": {
+      "sha256": "7646d1ec6b95f88096d50bd5e430014893b122829b06085d056d07f55d14bf3c"
+    },
+    "functions/miscfunc/misc.py": {
+      "sha256": "34bd518993cadfbbeb9b2700931218c6ed076ac87fb230afcfd2eb8d112fc6ab"
+    },
+    "plugins/clean_rawdata/asr_calibrate.py": {
+      "sha256": "1beeada61566bb9336d488aec3cb0a458ddc8d7a0b9425ba3b102e5b3a851972"
+    },
+    "plugins/clean_rawdata/asr_process.py": {
+      "sha256": "6fdf6c273e3a1b1efcbd319335cdff5efd0c5452cb1e2a5ba0067f28decdd23c"
+    },
+    "plugins/clean_rawdata/clean_windows.py": {
+      "sha256": "aa4b70a9e9e04e783b7df3075fcf8bf9502dc5f62a580dbbdc18ee05e9be329e"
+    },
+    "plugins/clean_rawdata/clean_asr.py": {
+      "sha256": "eff1a79f385cc682ae246129b82d25716d582dcd4e016acf24c4b3fa768b5c23"
+    }
+  },
+  "changes": [
+    "array-only window selection; independent MNE estimator",
+    "MATLAB colon endpoints and default pinv tolerance",
+    "fail on nonfinite calibration/reconstruction rather than substitute a result",
+    "no Riemannian branch; fixed explicit memory budget",
+    "no EEG dictionaries, runtime patches, or upstream package imports"
+  ]
+}

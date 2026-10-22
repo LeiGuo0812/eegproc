@@ -1,0 +1,4 @@
+# Run from the project root: python -m pip install -r requirements-eeglab.txt
+# Standard package plus the Python-only EEGLAB filter / bad-channel ports.
+# EEGPrep 0.4.0 requires Python >=3.12; Python 3.12 is recommended.
+.[eegprep]

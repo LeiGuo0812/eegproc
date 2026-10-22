@@ -1,0 +1,5 @@
+{
+  "purpose": "rest",
+  "highpass": 1.0,
+  "lowpass": 100.0
+}

@@ -1,0 +1,4 @@
+# Run from the project root: python -m pip install -r requirements-all.txt
+# Every runtime backend, without development tools.
+# Requires Python >=3.12 through EEGPrep; Python 3.12 has pyEDFlib binary wheels.
+.[eegprep,autoreject,device]

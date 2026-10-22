@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eegproc"
+dynamic = ["version"]
+description = "MNE-native EEG preprocessing with reproducible ICA review checkpoints"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "mne==1.12.1",
+    "mne-icalabel==0.10.0",
+    "torch>=2.0",
+    "pyprep==0.5.0",
+    "python-picard==0.8.2",
+    "scikit-learn>=1.4",
+    "matplotlib>=3.8",
+    "Pillow>=9.1",
+    "threadpoolctl>=3.1",
+]
+
+[project.optional-dependencies]
+eegprep = ["eegprep==0.4.0"]
+autoreject = ["autoreject==0.4.3"]
+device = ["pyedflib==0.1.42"]
+dev = [
+    "pytest>=8",
+    "markdown-it-py>=3",
+    "build>=1.2",
+    "wheel>=0.43",
+    "packaging>=23.2",
+    "psutil>=5.9",
+    "twine>=6",
+]
+
+[project.scripts]
+eegproc = "eegproc.cli:main"
+eegproc-prepare = "prepare_data:main"
+eeg-preprocess = "eegproc.cli:main"
+eeg-prepare = "prepare_data:main"
+
+[project.urls]
+Repository = "https://github.com/LeiGuo0812/eegproc"
+Documentation = "https://github.com/LeiGuo0812/eegproc/tree/main/docs"
+Issues = "https://github.com/LeiGuo0812/eegproc/issues"
+
+[tool.setuptools]
+include-package-data = true
+py-modules = ["erp_outputs", "mne_bridge", "neuracle_io", "prepare_data", "preprocess", "project_layout"]
+# ASR's own LICENSE is shipped as package data below. Listing another file
+# named LICENSE here would collide with the project license on setuptools 70.
+license-files = ["LICENSE", "NOTICE", "eegproc/resources/LICENSE-MNE.txt", "eegproc/RELEASE_STATUS.md", "docs/THIRD_PARTY_NOTICES.md"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["eegproc*", "eeg_pipeline*", "mne_asr"]
+exclude = ["tests*", "results*", "docs*", "scripts*", "python*"]
+namespaces = false
+
+[tool.setuptools.package-data]
+eegproc = ["RELEASE_STATUS.md"]
+"eegproc.resources" = ["*.elc", "LICENSE-MNE.txt", "PROVENANCE.json"]
+"eegproc.mne_asr" = ["LICENSE", "PROVENANCE.json", "README.md"]
+
+[tool.setuptools.dynamic]
+version = {attr = "eegproc.__version__"}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

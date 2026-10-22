@@ -1,0 +1,18 @@
+eegproc
+https://github.com/LeiGuo0812/eegproc
+
+Project-owned code and documentation are released under BSD-3-Clause.
+Third-party material retains its original copyrights and terms:
+
+* eegproc/mne_asr/: adapted from EEGPrep 0.4.0, BSD-2-Clause.
+  The moving-average routine retains its embedded Intheon/Syntrogi MIT notice.
+  See eegproc/mne_asr/LICENSE and PROVENANCE.json.
+* eegproc/resources/standard_1005.elc: copied unchanged from MNE-Python 1.12.1.
+  Copyright and BSD-3-Clause notice: eegproc/resources/LICENSE-MNE.txt.
+  Source version and SHA-256: eegproc/resources/PROVENANCE.json.
+* Installed Python dependencies are separate distributions with their own
+  licenses. No MATLAB, EEGLAB, CleanLine, or vendor MATLAB reader code is
+  bundled. The Python Neuracle adapter uses pyEDFlib and implements documented
+  calibration and event-index conventions for interoperability.
+
+See docs/THIRD_PARTY_NOTICES.md for source links and the inventory.

@@ -1,0 +1,56 @@
+{
+  "source": "MNE-Python",
+  "version": "1.12.1",
+  "license": "BSD-3-Clause",
+  "resource_url": "https://github.com/mne-tools/mne-python/blob/v1.12.1/mne/channels/data/montages/standard_1005.elc",
+  "license_url": "https://github.com/mne-tools/mne-python/blob/v1.12.1/LICENSE.txt",
+  "sha256": "1ee59197946d62de872db2ac7f2243a596662c231427366f6dc5d84ed237f853",
+  "adaptation": "Copied byte-for-byte from the installed MNE 1.12.1 distribution; no package downloaded.",
+  "prior_dipfit_sha256": "02764b11d930639b5c888a186833086aaef4e499dd5fdcaa4e1af493ac8603ea",
+  "usage": "The dictionary-to-Raw bridge consumes only the three native fiducials and their head transform.",
+  "native_fiducials_m": {
+    "nasion": [
+      8.3e-06,
+      0.08681100000000001,
+      -0.039983
+    ],
+    "lpa": [
+      -0.0860761,
+      -0.0199897,
+      -0.047986
+    ],
+    "rpa": [
+      0.08579389999999999,
+      -0.0200093,
+      -0.048031
+    ]
+  },
+  "native_to_head": [
+    [
+      0.9999999592211036,
+      -0.0001140396765039576,
+      -0.0002618257878916978,
+      -8.868681781826247e-06
+    ],
+    [
+      0.00013333690143166392,
+      0.9971890236660729,
+      0.07492685300461356,
+      0.023540426515118406
+    ],
+    [
+      0.0002525451677202167,
+      -0.07492688486021845,
+      0.9971889982075022,
+      0.04637508342080609
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "legacy_fiducials_and_transform_bitwise_equal": true,
+  "note": "MNE has 343 channel labels; the historical DIPFIT file adds O9/O10. Channel labels/positions in this resource are not used to assign input channel coordinates."
+}

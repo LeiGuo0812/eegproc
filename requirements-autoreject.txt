@@ -1,0 +1,3 @@
+# Run from the project root: python -m pip install -r requirements-autoreject.txt
+# Standard package plus optional local epoch interpolation.
+.[autoreject]

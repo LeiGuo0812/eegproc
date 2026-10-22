@@ -1,0 +1,3 @@
+# ICA continuation and the release manifest verify exact source bytes.
+# Preserve the recorded line endings on every platform, including Windows.
+* -text

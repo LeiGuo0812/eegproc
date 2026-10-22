@@ -1,0 +1,34 @@
+# Source distributions use an allowlist. Runtime wheel contents are controlled
+# by package discovery and package-data in pyproject.toml.
+global-exclude *
+include .gitignore .gitattributes pyproject.toml MANIFEST.in README.md README.zh-CN.md requirements*.txt LICENSE NOTICE CHANGELOG.md
+include RELEASE_MANIFEST.json
+include erp_outputs.py mne_bridge.py neuracle_io.py prepare_data.py preprocess.py project_layout.py
+recursive-include eeg_pipeline *.py
+recursive-include eegproc *.py
+include eegproc/RELEASE_STATUS.md
+include eegproc/mne_asr/LICENSE eegproc/mne_asr/PROVENANCE.json eegproc/mne_asr/README.md
+include eegproc/resources/LICENSE-MNE.txt eegproc/resources/PROVENANCE.json
+recursive-include eegproc/resources *.elc
+recursive-include mne_asr *.py
+recursive-include configs *.json
+recursive-include examples *.py
+include docs/ARCHITECTURE.md docs/ARCHITECTURE.html docs/PARAMETERS.md docs/PARAMETERS.html
+include docs/INSTALLATION.md docs/RELEASE_AUDIT.md docs/THIRD_PARTY_NOTICES.md
+recursive-include docs/en *.md
+recursive-include docs/zh-CN *.md
+recursive-include docs/assets *.png *.md
+recursive-include tests *.py
+include tests/fixtures/staged_v3/README.md
+include tests/fixtures/staged_v3/fixture_manifest.json
+include tests/fixtures/staged_v3/original_validation_summary.json
+include tests/fixtures/staged_v3/input_raw.fif
+include tests/fixtures/staged_v3/p16_rest_cont_raw.fif tests/fixtures/staged_v3/p16_erp_cont_raw.fif
+include tests/fixtures/staged_v3/p16_rest_manifest.json tests/fixtures/staged_v3/p16_erp_manifest.json
+include scripts/validate_pipeline.py scripts/validate_parameter_resolution.py scripts/validate_report_browser.py scripts/validate_install.py
+include scripts/stage_release.py scripts/validate_clean_install.py scripts/offline_build.py
+include scripts/generate_parameter_reference.py
+recursive-include .github/workflows *.yml *.yaml
+# Never package caches or local generated data, even under allowed directories.
+global-exclude *.py[cod] *.log .DS_Store
+prune **/__pycache__

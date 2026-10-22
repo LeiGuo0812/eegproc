@@ -1,0 +1,132 @@
+name: Package and clean installation
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: package-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clean-install:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: '3.11'
+            extras: dev,autoreject,device
+            tests: base
+            experimental: false
+          - os: windows-latest
+            python: '3.11'
+            extras: dev,autoreject,device
+            tests: base
+            experimental: false
+          - os: ubuntu-latest
+            python: '3.12'
+            extras: dev,eegprep,autoreject,device
+            tests: all
+            experimental: false
+          - os: windows-latest
+            python: '3.12'
+            extras: dev,eegprep,autoreject,device
+            tests: all
+            experimental: false
+          - os: ubuntu-latest
+            python: '3.13'
+            extras: dev
+            tests: base
+            experimental: true
+          - os: windows-latest
+            python: '3.13'
+            extras: dev
+            tests: base
+            experimental: true
+    env:
+      PYTHONUTF8: '1'
+      PYTHONDONTWRITEBYTECODE: '1'
+      MPLBACKEND: Agg
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      VALIDATION_EXTRAS: ${{ matrix.extras }}
+      VALIDATION_TESTS: ${{ matrix.tests }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: |
+            pyproject.toml
+            requirements*.txt
+      - name: Build source distribution and wheel
+        run: |
+          python -m pip install build
+          python -m build --outdir dist
+      - name: Prepare isolated CPU inference environment
+        shell: python
+        run: |
+          from pathlib import Path
+          import os, subprocess, sys
+          venv = Path(os.environ['RUNNER_TEMP'])/'eegproc-ci-venv'
+          subprocess.run([sys.executable, '-m', 'venv', str(venv)], check=True)
+          python = venv/('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+          subprocess.run([str(python), '-m', 'pip', 'install', 'torch',
+                          '--index-url', 'https://download.pytorch.org/whl/cpu'], check=True)
+      - name: Install dependencies in an isolated venv and exercise installed package
+        shell: python
+        run: |
+          from pathlib import Path
+          import os, subprocess, sys
+          wheel = next(Path('dist').glob('*.whl'))
+          subprocess.run([
+              sys.executable, 'scripts/validate_clean_install.py',
+              '--wheel', str(wheel), '--venv', str(Path(os.environ['RUNNER_TEMP'])/'eegproc-ci-venv'),
+              '--output', '.ci-evidence', '--extras', os.environ['VALIDATION_EXTRAS'],
+              '--timeout', '1800',
+          ], check=True)
+      - name: Run regression tests using the same installed dependencies
+        shell: python
+        run: |
+          from pathlib import Path
+          import os, subprocess
+          python = Path(os.environ['RUNNER_TEMP'])/'eegproc-ci-venv'/('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+          base_tests = [
+              'tests/test_public_interface.py', 'tests/test_raw_slice_annotations.py',
+              'tests/test_clean_install_validator.py', 'tests/test_configuration.py',
+              'tests/test_config_api_refactor.py', 'tests/test_runtime_parameters.py',
+              'tests/test_eegproc_namespace.py', 'tests/test_montage_resource.py',
+          ]
+          targets = ['tests'] if os.environ['VALIDATION_TESTS'] == 'all' else base_tests
+          subprocess.run([str(python), '-B', '-m', 'pytest', '-q', *targets], check=True)
+      - name: Retain evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: install-${{ matrix.os }}-py${{ matrix.python }}
+          path: |
+            .ci-evidence/
+            dist/
+          include-hidden-files: true
+          if-no-files-found: warn
+
+# This workflow is a proposed release gate, not evidence of a successful run.
+# Python 3.13 is experimental until its results have been reviewed. macOS is not
+# covered. The scientific worker generates synthetic arrays and blocks network
+# connections during processing; dependency installation needs Internet access.
+# EEGPrep 0.4.0 needs Python >=3.12. Python 3.11 therefore exercises the standard
+# backend and selected base tests. Python 3.13 omits pyEDFlib 0.1.42 because it has
+# no Windows/Linux x86-64 cp313 wheel; optional device builds are not certified.
+# CI explicitly uses official CPU PyTorch wheels; CUDA execution is not tested.

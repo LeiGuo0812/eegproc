@@ -1,0 +1,49 @@
+{
+  "moved_date": "2026-10-20",
+  "regenerated": false,
+  "files": [
+    {
+      "source": "results/p16_staged_refactor/p16_rest/p16_rest_stages/00_input_raw.fif",
+      "destination": "tests/fixtures/staged_v3/input_raw.fif",
+      "bytes": 1150328,
+      "sha256": "9ca6925d4501106f8e365946489e1b48fe87416b90ab099525a6dc4a7833d0e3",
+      "category": "retained_reference"
+    },
+    {
+      "source": "results/p16_staged_refactor/p16_rest/p16_rest_cont_raw.fif",
+      "destination": "tests/fixtures/staged_v3/p16_rest_cont_raw.fif",
+      "bytes": 1150348,
+      "sha256": "985f11eb18826da6b471c1786c9cddc133ebc740411f7871177fda59bd46ecc1",
+      "category": "retained_reference"
+    },
+    {
+      "source": "results/p16_staged_refactor/p16_erp/p16_erp_cont_raw.fif",
+      "destination": "tests/fixtures/staged_v3/p16_erp_cont_raw.fif",
+      "bytes": 1150348,
+      "sha256": "49c1ab5184ccd9b48466a5e6d7a90b069414e27d0b1a251486349cc81ed0488e",
+      "category": "retained_reference"
+    },
+    {
+      "source": "results/p16_staged_refactor/p16_rest/p16_rest_balanced_manifest.json",
+      "destination": "tests/fixtures/staged_v3/p16_rest_manifest.json",
+      "bytes": 53472,
+      "sha256": "c182b123374d6180636e7b23a1a97356eb6e93493a0718b1e836ab5cc2d0658f",
+      "category": "retained_reference"
+    },
+    {
+      "source": "results/p16_staged_refactor/p16_erp/p16_erp_balanced_manifest.json",
+      "destination": "tests/fixtures/staged_v3/p16_erp_manifest.json",
+      "bytes": 48641,
+      "sha256": "2a008dcbb140b965c1f327394c507b350c740568aaf077bb4a82b7c76eee313d",
+      "category": "retained_reference"
+    },
+    {
+      "source": "results/p16_staged_refactor/validation_summary.json",
+      "destination": "tests/fixtures/staged_v3/original_validation_summary.json",
+      "bytes": 27138,
+      "sha256": "bbc90045468c2d63bc9747cfedc67a4519a2ea9801e5b37a1f51b7b6741ad76b",
+      "category": "retained_reference"
+    }
+  ],
+  "release_snapshot_note": "Existing file hashes describe the original historical fixture files. FIF bytes are unchanged; JSON path prefixes were sanitized. Use RELEASE_MANIFEST.json at the source root for staged-file hashes."
+}

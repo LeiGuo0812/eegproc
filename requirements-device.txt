@@ -1,0 +1,4 @@
+# Run from the project root: python -m pip install -r requirements-device.txt
+# Standard package plus the Neuracle BDF preparation reader.
+# pyEDFlib 0.1.42 has no CPython 3.13 Windows/Linux x64 wheel; prefer 3.11 or 3.12.
+.[device]

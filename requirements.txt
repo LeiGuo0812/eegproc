@@ -1,0 +1,4 @@
+# Run from the project root: python -m pip install -r requirements.txt
+# Install the package and its standard runtime dependencies from pyproject.toml.
+# Optional backends are available through the corresponding requirements files.
+.

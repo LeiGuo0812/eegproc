@@ -1,0 +1,1028 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>EEG preprocessing 0.3.1 — Parameters</title><style>body{max-width:1120px;margin:36px auto;padding:0 24px;color:#24323f;background:#fff;font:16px/1.7 system-ui,Arial,sans-serif}h1,h2{line-height:1.3;font-weight:600}h1{font-size:30px}h2{margin-top:40px;font-size:23px}a{color:#17659d}table{width:100%;border-collapse:collapse;font-size:14px;margin:20px 0}th,td{text-align:left;vertical-align:top;border-bottom:1px solid #dce3e8;padding:10px}th{background:#f3f6f8}pre{overflow:auto;background:#f3f6f8;padding:18px;border:1px solid #e3e9ed;border-radius:5px;line-height:1.55}code{font-family:Consolas,monospace;font-size:.9em}.flow{border:1px solid #dce3e8;padding:22px;margin:26px 0;text-align:center;background:#fafcfd}.row{display:flex;justify-content:center;gap:14px;flex-wrap:wrap}.row span,.node{border:1px solid #b5c7d4;background:#fff;padding:10px 14px;border-radius:4px}.node{max-width:780px;margin:0 auto}.arrow{color:#49748e;font-size:22px;line-height:1.5}@media(max-width:700px){body{padding:0 14px;font-size:15px}table{display:block;overflow:auto}.flow{padding:12px}.row{gap:8px}}</style></head><body><h1>EEG preprocessing：完整参数清单</h1>
+<p>根据 2026-10-22 当前 0.3.1 代码核对。主配置 <code>PipelineConfig</code> 共 <strong>75 个字段</strong>；<code>asr_options</code> 另有 <strong>10 个高级键</strong>，<code>EpochConfig</code> 有 <strong>12 个分段字段</strong>。以下是程序实际支持的接口，没有增加或修改任何默认参数。</p>
+<p>主表默认值为 <code>preset=&quot;standard&quot;, purpose=&quot;rest&quot;</code>。标准 ERP 仅将 <code>purpose</code> 改为 <code>&quot;erp&quot;</code>、<code>task_name</code> 默认改为 <code>None</code>、分析频带改为 <strong>0.1–30 Hz</strong>；ASR 默认仍开启。时间单位为秒、频率为 Hz、幅度阈值为 µV；Raw 本身仍使用 MNE 的 SI 单位（EEG 为 V）。</p>
+<pre><code class="language-python">from eegproc import run, PipelineConfig
+
+config = PipelineConfig(purpose=&quot;erp&quot;, task_name=&quot;oddball&quot;,
+                        highpass=0.1, lowpass=30.0,
+                        epoch_mode=&quot;events&quot;, epoch_tmin=-0.2, epoch_tmax=1.0)
+result = run(raw, &quot;outputs/sub01&quot;, &quot;sub01&quot;, config=config,
+             events=events, event_id={&quot;standard&quot;: 1, &quot;target&quot;: 2})
+# 同样可以直接：run(raw, output, subject, purpose=&quot;erp&quot;, task_name=&quot;oddball&quot;, ...)
+</code></pre>
+<p>配置优先级：预设默认值 &lt; 显式指定的配置文件 &lt; 配置对象/字典 &lt; 本次代码关键字。完整配置对象包含当时解析出的全部字段值；切换整套用途默认值时重新构造对象。运行时还会根据实际 Raw 检查输入相关限制，最终以报告中的有效配置为准。<code>None</code>、<code>False</code>、<code>[]</code> 是明确值，不等同于未提供。</p>
+<h2>自动解析与修正</h2>
+<p>Python、JSON 和 CLI 使用同一个参数解析器。已满足类型、依赖、输入与后端数值约束的请求沿用原值，预设声明的默认值不变；以下表格中的类型、范围和条件描述的是<strong>实际生效值</strong>。不满足这些条件的参数或可选分段请求按下表处理，并记录调整或跳过原因。</p>
+<table>
+<thead>
+<tr>
+<th>请求情况</th>
+<th>生效处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>不支持的选项、错误类型、非有限数值、超出范围</td>
+<td>采用所选 <code>preset</code> / <code>purpose</code> 的对应默认值；不会把 Python 字符串 <code>&quot;false&quot;</code> 猜成布尔值</td>
+</tr>
+<tr>
+<td>高低通顺序颠倒或区间为空</td>
+<td>该对频带参数一起回到所选预设默认值</td>
+</tr>
+<tr>
+<td>未知或已退役的主参数</td>
+<td>忽略该键并记录；不会自动匹配相近拼写</td>
+</tr>
+<tr>
+<td>可选配置文件无法读取、JSON 非法或配置来源类型不支持</td>
+<td>记录问题，继续使用预设默认值和有效的代码参数；有效的其他配置来源保留</td>
+</tr>
+<tr>
+<td><code>asr_options</code> 中未知、非法或与顶层重复的键</td>
+<td>忽略该键，使用后端默认值或对应顶层值；其他有效高级选项保留</td>
+</tr>
+<tr>
+<td>显式给出 <code>ica_exclude</code>，但仍为 <code>ica_mode=&quot;auto&quot;</code></td>
+<td>转为 <code>manual</code>，按完整名单处理</td>
+</tr>
+<tr>
+<td>人工名单缺失、包含负数或非整数</td>
+<td>保持人工模式，采用空名单保留全部 IC，并要求人工复核；不会回退到自动剔除</td>
+</tr>
+<tr>
+<td>人工名单有重复索引</td>
+<td>去重，保留同一选择</td>
+</tr>
+<tr>
+<td>人工索引超出本次 ICA 分解范围</td>
+<td>丢弃越界索引，保留合法项；无合法项时全保留，仍保持人工选择</td>
+</tr>
+<tr>
+<td><code>ica_enabled=False</code> 与 manual/review 同时设置</td>
+<td>ICA 保持关闭；模式调整为 auto、名单清空为 None</td>
+</tr>
+<tr>
+<td><code>interpolate_bads=False</code>，但要求 ASR 前插值</td>
+<td>关闭 ASR 前插值；总开关优先</td>
+</tr>
+<tr>
+<td>两个插值阶段都关闭，但总插值开关打开</td>
+<td>关闭总插值开关</td>
+</tr>
+<tr>
+<td>局部修复与 rest、固定分段或 annotations QC 冲突，或未请求分段</td>
+<td>关闭不适用的局部修复</td>
+</tr>
+<tr>
+<td>请求频带超出输入采样率或已应用滤波范围</td>
+<td>在输入可支持范围内调整频带并记录；不重采样，不恢复已丢失的频率</td>
+</tr>
+<tr>
+<td>采样率 &lt;100 Hz，但请求启用 ICA</td>
+<td>关闭本流程的 ICA/ICLabel 阶段并记录；当前 ICLabel 自相关特征实现不支持该范围，不生成替代分类</td>
+</tr>
+<tr>
+<td>采样率 ≤80 Hz，但请求启用当前 ASR 后端</td>
+<td>关闭 ASR 并记录，因为该后端的频谱整形不支持这一采样率</td>
+</tr>
+<tr>
+<td>spectrum_fit 窗长/带宽组合不满足当前采样率与完整记录样本数的数值条件</td>
+<td>回到 4 秒 / 2 Hz 配对并记录；随后检查各连续段的支持情况</td>
+</tr>
+<tr>
+<td>spectrum_fit 窗长换算为样本数发生数值溢出</td>
+<td>限制为完整记录时长并记录，再检查拟合支持条件</td>
+</tr>
+<tr>
+<td>BAD 或采集边界切出的短段无法支持 spectrum_fit</td>
+<td>仅跳过该段工频拟合，保留样本并报告段范围；其他支持段继续处理</td>
+</tr>
+<tr>
+<td>请求事件分段，但缺少可用事件、映射非法、事件重复或超出记录范围</td>
+<td>跳过本次事件分段，继续连续预处理；报告明确记录原因，不猜测事件时刻或含义</td>
+</tr>
+<tr>
+<td>请求的 ERP 时间窗超过整段记录时长</td>
+<td>跳过本次事件分段，继续连续预处理；不自动缩短用户的 ERP 时间窗</td>
+</tr>
+<tr>
+<td>CLI 显式指定的事件 JSON 缺失、损坏或为空</td>
+<td>记录并跳过事件分段，继续连续预处理；不会擅自换成 Raw 注释事件</td>
+</tr>
+<tr>
+<td>固定分段同时传入事件数组</td>
+<td>仍按固定长度分段，忽略额外事件并记录</td>
+</tr>
+<tr>
+<td>基线区间在实际分段采样网格上没有采样点</td>
+<td>关闭该次分段基线校正并记录，不移动基线区间或伪造采样点</td>
+</tr>
+<tr>
+<td><code>collect_stages</code> 不是布尔值</td>
+<td>回到 False，不额外创建中间阶段的内存副本，并记录</td>
+</tr>
+</tbody>
+</table>
+<p>参数构造后的调整可从 <code>config.adjustments</code> 查看。运行中的完整参数调整记录保存在 <code>result.report[&quot;parameter_adjustments&quot;]</code>，并直接显示在 HTML 的 <strong>Summary → Parameter adjustments</strong> 表格中，列出原请求、生效值和原因。有效主配置在 <code>result.report[&quot;config&quot;]</code>；分段实际配置与工频短段跳过记录另行报告。</p>
+<p>自动回退的范围是已定义的配置错误、输入限制和可选分段请求，不会忽略所有运行异常。未知 CLI 标志、缺少必填输入、损坏或无法读取的原始数据、无效采集元数据、输出路径冲突、缺失或不兼容的必需依赖，以及算法数值失败仍会明确报错或将本次运行标记为失败。<code>bad_channel_policy=&quot;stop&quot;</code> 也继续执行用户指定的停止规则。</p>
+<pre><code class="language-python">config = PipelineConfig(purpose=&quot;erp&quot;, highpass=-1.0, n_threads=0)
+assert config.highpass == 0.1 and config.n_threads == 1
+for item in config.adjustments:
+    print(item[&quot;field&quot;], item[&quot;requested&quot;], item[&quot;effective&quot;], item[&quot;reason&quot;])
+</code></pre>
+<h2>主配置：75 个字段</h2>
+<h3>基本设置（5）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>preset</code></td>
+<td><code>&quot;standard&quot;</code></td>
+<td><code>standard</code> / <code>eeglab</code>；选择参数预设，流程顺序相同</td>
+</tr>
+<tr>
+<td><code>purpose</code></td>
+<td><code>&quot;rest&quot;</code></td>
+<td><code>rest</code> / <code>erp</code>；选择用途默认值；ERP 不自动请求分段</td>
+</tr>
+<tr>
+<td><code>task_name</code></td>
+<td><code>&quot;rest&quot;</code></td>
+<td>自定义任务名，如 <code>eyes_closed</code>、<code>oddball</code>；ERP 默认 <code>None</code>；不改变算法或文件名；非空标签最长 100 字符</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td><code>20261018</code></td>
+<td>随机种子，整数 <code>0 ≤ seed &lt; 2**32</code></td>
+</tr>
+<tr>
+<td><code>n_threads</code></td>
+<td><code>1</code></td>
+<td>计算线程限制，正整数；不是同时处理被试数</td>
+</tr>
+</tbody>
+</table>
+<h3>滤波（7）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>highpass</code></td>
+<td><code>0.5</code></td>
+<td>最终分析高通；ERP 默认 <code>0.1</code></td>
+</tr>
+<tr>
+<td><code>lowpass</code></td>
+<td><code>80.0</code></td>
+<td>最终分析低通；ERP 默认 <code>30.0</code></td>
+</tr>
+<tr>
+<td><code>training_highpass</code></td>
+<td><code>1.0</code></td>
+<td>ICA 训练高通</td>
+</tr>
+<tr>
+<td><code>training_lowpass</code></td>
+<td><code>100.0</code></td>
+<td>ICA 训练低通</td>
+</tr>
+<tr>
+<td><code>filter_method</code></td>
+<td><code>&quot;mne_fir&quot;</code></td>
+<td><code>mne_fir</code> / <code>eeglab_fir</code> / <code>off</code>；EEGLAB FIR 使用 EEGPrep Python 实现</td>
+</tr>
+<tr>
+<td><code>filter_order</code></td>
+<td><code>15000</code></td>
+<td>只用于 <code>eeglab_fir</code>；≥2 的偶数；MNE FIR 不使用此值</td>
+</tr>
+<tr>
+<td><code>filter_position</code></td>
+<td><code>&quot;after_reference&quot;</code></td>
+<td>当前只接受此值，不能据此调整处理顺序</td>
+</tr>
+</tbody>
+</table>
+<p>生效的两套频带均满足 <code>0 &lt; highpass &lt; lowpass &lt; sfreq/2</code>，包括当前实现的关闭滤波模式。标准 100 Hz 训练低通只有采样率大于 200 Hz 且输入实际保留该频带时才能完整实现；否则程序根据输入上限调整并报告，不自动重采样。输入已经高通移除的慢成分无法恢复；因输入限制调整 ICA 训练频带后偏离 1–100 Hz 时，报告要求人工复核 ICLabel 结果。合法的显式训练频带和 EEGLAB 参数预设不会仅因偏离该频带而计作自动参数修正。分析和训练频带相同时共用完整记录缓冲，但算法工作缓冲及剔除坏段后的训练数据仍可能需要内存。</p>
+<h3>工频（5）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>line_method</code></td>
+<td><code>&quot;spectrum_fit&quot;</code></td>
+<td><code>spectrum_fit</code> / <code>notch</code> / <code>off</code>；<code>notch</code> 为 MNE 零相位 FIR 陷波</td>
+</tr>
+<tr>
+<td><code>line_frequency</code></td>
+<td><code>50.0</code></td>
+<td>工频基频；例如 50 或 60；<code>None</code> 关闭；不自动识别</td>
+</tr>
+<tr>
+<td><code>line_window_seconds</code></td>
+<td><code>4.0</code></td>
+<td>spectrum_fit 拟合窗，正数</td>
+</tr>
+<tr>
+<td><code>line_bandwidth</code></td>
+<td><code>2.0</code></td>
+<td>spectrum_fit 多锥谱带宽，正数</td>
+</tr>
+<tr>
+<td><code>line_p_value</code></td>
+<td><code>0.05</code></td>
+<td>spectrum_fit 的检验 p 值门槛，<code>0 &lt; p &lt; 1</code></td>
+</tr>
+</tbody>
+</table>
+<p>处理给定基频及不超过 <code>min(100, sfreq/2−1)</code> Hz 的整数谐波。后面三个拟合参数只在 <code>spectrum_fit</code> 下影响清理。目前没有 <code>CleanLine</code> 选项。</p>
+<p>spectrum_fit 还检查 DPSS/COLA 的数值约束：实际窗至少 2 个样本，带宽小于采样率，且 <code>实际样本数 × 带宽 / (2 × 采样率) ≥ 0.5</code>。以完整记录为上限检查参数时不满足这些条件，先选用 4 秒 / 2 Hz 的标准配对。随后按每个 BAD 或采集边界分出的片段检查；不支持的片段只跳过拟合并保留数据，不逐段更换参数。所有片段都支持拟合时沿用原来的完整 MNE 调用路径；这些检查没有另设科学意义上的最低记录时长。</p>
+<h3>坏导、插值与参考（12）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>channel_method</code></td>
+<td><code>&quot;pyprep&quot;</code></td>
+<td><code>pyprep</code> / <code>eegprep</code> / <code>off</code>；关闭自动检测仍保留输入坏导</td>
+</tr>
+<tr>
+<td><code>detect_ransac</code></td>
+<td><code>True</code></td>
+<td>仅 PyPREP：启用 RANSAC 坏导检测</td>
+</tr>
+<tr>
+<td><code>flatline_seconds</code></td>
+<td><code>5.0</code></td>
+<td>仅 EEGPrep：平线时长门槛，正数</td>
+</tr>
+<tr>
+<td><code>channel_correlation</code></td>
+<td><code>0.8</code></td>
+<td>仅 EEGPrep：通道相关门槛，介于 0 与 1</td>
+</tr>
+<tr>
+<td><code>channel_broken_fraction</code></td>
+<td><code>0.4</code></td>
+<td>仅 EEGPrep：允许不良时段比例，介于 0 与 1</td>
+</tr>
+<tr>
+<td><code>bad_channel_fraction_limit</code></td>
+<td><code>0.3</code></td>
+<td>坏导比例复核门槛；介于 0 与 1</td>
+</tr>
+<tr>
+<td><code>bad_channel_policy</code></td>
+<td><code>&quot;report&quot;</code></td>
+<td><code>report</code> 超比例继续并报告；<code>stop</code> 超比例停止；<code>auto</code> 当前等同 report</td>
+</tr>
+<tr>
+<td><code>reference</code></td>
+<td><code>&quot;average&quot;</code></td>
+<td><code>average</code> / <code>unchanged</code>；控制流程参考操作</td>
+</tr>
+<tr>
+<td><code>interpolate_bads</code></td>
+<td><code>True</code></td>
+<td>总体允许坏导插值</td>
+</tr>
+<tr>
+<td><code>interpolate_before_asr</code></td>
+<td><code>False</code></td>
+<td>是否在 ASR 前插值；开启要求 interpolate_bads=True</td>
+</tr>
+<tr>
+<td><code>final_interpolation</code></td>
+<td><code>True</code></td>
+<td>是否在末尾插值；也受总插值开关控制</td>
+</tr>
+<tr>
+<td><code>final_reference</code></td>
+<td><code>True</code></td>
+<td>是否执行末次参考；关掉不会取消前面已做的参考</td>
+</tr>
+</tbody>
+</table>
+<p><code>reference=&quot;unchanged&quot;</code> 时末次参考也不改变数据。开启总插值时，ASR 前或最终至少一个插值位置须启用。<code>bad_channel_policy=&quot;report&quot;</code> 取消的是坏导比例超限停止；不足 8 个可用 EEG 通道等不可计算情况仍会报错。</p>
+<h3>ASR（3）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>asr_cutoff</code></td>
+<td><code>20.0</code></td>
+<td>ASR 阈值；正数启用，<code>None</code> 关闭；rest/ERP 均默认 20</td>
+</tr>
+<tr>
+<td><code>asr_backend</code></td>
+<td><code>&quot;mne_native&quot;</code></td>
+<td>当前只支持此独立 MNE 兼容后端</td>
+</tr>
+<tr>
+<td><code>asr_options</code></td>
+<td><code>None</code></td>
+<td>高级参数字典；None 使用 ASR 内部默认值，允许键见后表</td>
+</tr>
+</tbody>
+</table>
+<h3>ICA、人工选择与训练（16）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ica_enabled</code></td>
+<td><code>True</code></td>
+<td>是否拟合并应用 ICA；False 时非 auto 模式会调整为 auto，ICA 保持关闭</td>
+</tr>
+<tr>
+<td><code>ica_backend</code></td>
+<td><code>&quot;mne&quot;</code></td>
+<td>当前只支持 MNE 接口</td>
+</tr>
+<tr>
+<td><code>ica_method</code></td>
+<td><code>&quot;picard&quot;</code></td>
+<td><code>picard</code> / <code>infomax</code>；两者当前都按 extended-Infomax 设置</td>
+</tr>
+<tr>
+<td><code>ica_max_iter</code></td>
+<td><code>1000</code></td>
+<td>最大迭代次数，正整数</td>
+</tr>
+<tr>
+<td><code>ica_tolerance</code></td>
+<td><code>1e-7</code></td>
+<td>Picard 的 tol / Infomax 的 w_change，正数</td>
+</tr>
+<tr>
+<td><code>rank_method</code></td>
+<td><code>&quot;relative&quot;</code></td>
+<td><code>relative</code> / <code>covariance</code>；决定 ICA 分解维度</td>
+</tr>
+<tr>
+<td><code>ica_rule</code></td>
+<td><code>&quot;threshold&quot;</code></td>
+<td><code>threshold</code> 概率门槛 / <code>class_max</code> 原脚本最高类别规则</td>
+</tr>
+<tr>
+<td><code>artifact_threshold</code></td>
+<td><code>0.9</code></td>
+<td>仅 threshold：伪迹概率下限；允许 <code>[0.5, 1]</code></td>
+</tr>
+<tr>
+<td><code>brain_probability_max</code></td>
+<td><code>0.2</code></td>
+<td>仅 threshold：脑概率上限；允许 <code>[0, 0.5]</code></td>
+</tr>
+<tr>
+<td><code>heart_min_ecg_correlation</code></td>
+<td><code>0.3</code></td>
+<td>仅 threshold 且有可用 ECG：心电候选绝对相关下限；允许 <code>[0, 1]</code></td>
+</tr>
+<tr>
+<td><code>ica_mode</code></td>
+<td><code>&quot;auto&quot;</code></td>
+<td><code>auto</code> 自动应用；<code>review</code> 保存断点并暂停；<code>manual</code> 应用完整人工名单</td>
+</tr>
+<tr>
+<td><code>ica_exclude</code></td>
+<td><code>None</code></td>
+<td>从 0 开始的完整名单；显式名单选用 manual，<code>[]</code> 全保留；人工名单缺失或非法时全保留并报告</td>
+</tr>
+<tr>
+<td><code>review_author</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>初次运行人工选择的复核者，记录用途</td>
+</tr>
+<tr>
+<td><code>review_reason</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>初次运行人工选择的理由，记录用途</td>
+</tr>
+<tr>
+<td><code>exclude_gross_from_training</code></td>
+<td><code>True</code></td>
+<td>ICA 训练排除按 gross_peak_uv 检出的粗大伪迹窗</td>
+</tr>
+<tr>
+<td><code>min_training_seconds</code></td>
+<td><code>20.0</code></td>
+<td>共用最短有效时长设置：用于坏导检测数据量、ICA 有效段及 ASR 连续段；不是独立参考数据充分性的保证</td>
+</tr>
+</tbody>
+</table>
+<p>threshold 模式使用肌电、眼电、心电、工频、通道噪声的共同概率门槛，同时要求脑概率不超过上限。目前不能按类别分别配置五个概率门槛。只有心电类达到伪迹门槛的候选，在有可用 ECG 时还须满足相关门槛；没有可用 ECG 则只用 ICLabel。当前 ECG 辅助是候选确认，不会仅因 ECG 相关高而额外添加 IC。</p>
+<p>只有 ICA 阶段实际运行时才准备 ECG 辅助，其内部目标频带为 1–40 Hz；该频带不是单独开放的用户参数。</p>
+<p>本版本在采样率低于 100 Hz 时关闭整套 ICA/ICLabel 阶段，依据是当前 ICLabel 自相关特征实现的输入限制；这不是 ICA 数学方法的通用最低采样率。程序不会为通过分类而自动重采样或伪造概率。<code>80 &lt; sfreq &lt; 100</code> 时 ASR 仍可独立运行；<code>sfreq ≤80</code> 时当前 ASR 后端也关闭。100 Hz、128 Hz 等输入仍可进入 ICA，但训练频带必须受输入上限约束，相关调整与复核要求会进入报告。</p>
+<p>class_max：眼电为最高类别即删除；肌电/工频/通道噪声为最高且 Brain≤0.5 才删除；并列最高计入，不按 Heart/Other 删除。该模式不使用上述可调概率阈值及 ECG 门槛。人工完整名单替代自动建议。</p>
+<p>relative 的奇异值相对门槛为内部固定值 1e-6（兼顾机器精度）；covariance 采用矩阵秩与 µV² 协方差特征值大于 1e-7 的维数之较小值。当前不提供独立的 n_components 配置。</p>
+<h3>连续质量控制（8）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>gross_peak_uv</code></td>
+<td><code>500.0</code></td>
+<td>粗大伪迹绝对幅值门槛，主要用于 ICA 训练排除</td>
+</tr>
+<tr>
+<td><code>residual_qc</code></td>
+<td><code>True</code></td>
+<td>是否添加自动 BAD_residual；False 仍保留原始 BAD</td>
+</tr>
+<tr>
+<td><code>residual_peak_uv</code></td>
+<td><code>150.0</code></td>
+<td>残余绝对幅值门槛；默认也传给事件窗 QC</td>
+</tr>
+<tr>
+<td><code>residual_ptp_uv</code></td>
+<td><code>200.0</code></td>
+<td>残余峰峰值门槛；默认也传给事件窗 QC</td>
+</tr>
+<tr>
+<td><code>residual_robust_z</code></td>
+<td><code>6.0</code></td>
+<td>相对异常 robust-z 门槛；默认也传给事件窗 QC</td>
+</tr>
+<tr>
+<td><code>residual_relative_min_ptp_uv</code></td>
+<td><code>50.0</code></td>
+<td>相对异常判定须同时超过的峰峰值下限</td>
+</tr>
+<tr>
+<td><code>window_seconds</code></td>
+<td><code>1.0</code></td>
+<td>连续粗大/残余伪迹检查窗，正数</td>
+</tr>
+<tr>
+<td><code>guard_seconds</code></td>
+<td><code>0.25</code></td>
+<td>连续异常窗两侧扩展保护时间，非负</td>
+</tr>
+</tbody>
+</table>
+<p>幅度和相对异常阈值均为正数。连续 BAD 是注释，不删除连续样本。事件窗 QC 可用独立 EpochConfig 改变阈值，不必同时改变连续 QC。</p>
+<h3>事件与分段（11）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>epoch_mode</code></td>
+<td><code>&quot;none&quot;</code></td>
+<td><code>none</code> / <code>events</code> / <code>fixed</code>；是否按事件或固定长度分段</td>
+</tr>
+<tr>
+<td><code>epoch_qc</code></td>
+<td><code>&quot;auto&quot;</code></td>
+<td><code>auto</code> / <code>event-window</code> / <code>annotations</code></td>
+</tr>
+<tr>
+<td><code>repair_epochs</code></td>
+<td><code>False</code></td>
+<td>显式启用 AutoReject 局部修复；仅 ERP + events + auto/event-window</td>
+</tr>
+<tr>
+<td><code>epoch_tmin</code></td>
+<td><code>-0.2</code></td>
+<td>事件前起点，须 ≤0</td>
+</tr>
+<tr>
+<td><code>epoch_tmax</code></td>
+<td><code>1.0</code></td>
+<td>事件后终点，须 &gt;0</td>
+</tr>
+<tr>
+<td><code>epoch_baseline</code></td>
+<td><code>(None, 0.0)</code></td>
+<td>从试次起点到 0 秒做基线；None 关闭；端点须落在试次内</td>
+</tr>
+<tr>
+<td><code>fixed_epoch_duration</code></td>
+<td><code>2.0</code></td>
+<td>固定分段长度</td>
+</tr>
+<tr>
+<td><code>fixed_epoch_overlap</code></td>
+<td><code>0.0</code></td>
+<td>固定分段重叠，<code>0 ≤ overlap &lt; duration</code></td>
+</tr>
+<tr>
+<td><code>event_source</code></td>
+<td><code>&quot;auto&quot;</code></td>
+<td><code>auto</code> 优先注释、无事件时尝试 STIM；也可指定 annotations/stim</td>
+</tr>
+<tr>
+<td><code>event_names</code></td>
+<td><code>None</code></td>
+<td>保留的事件名称列表/元组；None 不额外筛选</td>
+</tr>
+<tr>
+<td><code>stim_channel</code></td>
+<td><code>None</code></td>
+<td>STIM 通道名；None 使用 MNE 的通道选择</td>
+</tr>
+</tbody>
+</table>
+<p>显式传入 events 会将 epoch_mode=none 升为 events，在事件分段模式下优先于自动事件提取；显式选择 fixed 时则忽略额外事件数组并记录。auto QC 对 events 使用 event-window、对 fixed 使用 annotations，与 purpose 无直接绑定。event-window 只忽略本次新加的 BAD_residual，并按实际试次再检查，保留输入原有 BAD；annotations 按连续 BAD 排除重叠试次，不做额外逐试次幅度筛选。固定分段总是 tmin=0、tmax=duration−1/sfreq、baseline=None。</p>
+<p>CLI 的 <code>--events-json</code> 是显式事件来源：文件不能使用时跳过分段并报告。自动发现的同名 <code>.events.json</code> 若内容是有效的空事件列表，则继续从 Raw 注释或 STIM 提取；损坏的自动事件文件则记录错误并跳过分段。基线端点还会按实际采样网格检查：连续时间上合法、但未包含任何采样点的基线区间会关闭基线校正并报告。</p>
+<h3>报告（8）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>标准静息默认</th>
+<th>含义、选项和条件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>report_full_record_heatmap</code></td>
+<td><code>False</code></td>
+<td>是否额外绘制全程数据热图</td>
+</tr>
+<tr>
+<td><code>report_waveform_windows</code></td>
+<td><code>3</code></td>
+<td>代表性前后波形窗数，正整数</td>
+</tr>
+<tr>
+<td><code>report_window_seconds</code></td>
+<td><code>4.0</code></td>
+<td>每个波形展示窗长度，正数</td>
+</tr>
+<tr>
+<td><code>report_max_channels</code></td>
+<td><code>6</code></td>
+<td>波形展示通道数上限，整数且 ≥2；实际可更少</td>
+</tr>
+<tr>
+<td><code>report_dpi</code></td>
+<td><code>100</code></td>
+<td>图像 DPI，整数且 ≥60</td>
+</tr>
+<tr>
+<td><code>report_max_width</code></td>
+<td><code>1200</code></td>
+<td>图像宽度上限（像素），整数且 ≥600</td>
+</tr>
+<tr>
+<td><code>report_psd_windows</code></td>
+<td><code>30</code></td>
+<td>PSD 代表性窗数上限，正整数；也约束工频诊断采样窗数</td>
+</tr>
+<tr>
+<td><code>report_psd_window_seconds</code></td>
+<td><code>None</code></td>
+<td>None 自动取 min(20, max(4, 2/highpass)) 秒；标准静息 4 秒、ERP 20 秒</td>
+</tr>
+</tbody>
+</table>
+<p>报告参数不改变清理结果。工频诊断的窗长独立于 PSD 展示窗，当前最多 4 秒。以上选项应在 run 之前设置；render_report 复用已有图，不能用来重新绘制不同窗长的数据。</p>
+<h2>ASR 高级选项：10 个键</h2>
+<p>这些键放在 <code>asr_options={...}</code>，不能直接作为顶层关键字。</p>
+<table>
+<thead>
+<tr>
+<th>键</th>
+<th>内部默认</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>reference_window</code></td>
+<td><code>1.0</code></td>
+<td>参考筛选窗，秒</td>
+</tr>
+<tr>
+<td><code>reference_max_bad_channels</code></td>
+<td><code>0.075</code></td>
+<td>参考窗允许坏导比例，<code>0 ≤ value &lt; 1</code></td>
+</tr>
+<tr>
+<td><code>reference_tolerances</code></td>
+<td><code>(-inf, 5.5)</code></td>
+<td>参考筛选的下/上容限；默认下侧不限制</td>
+</tr>
+<tr>
+<td><code>calibration_window</code></td>
+<td><code>0.5</code></td>
+<td>校准窗，秒</td>
+</tr>
+<tr>
+<td><code>overlap</code></td>
+<td><code>0.66</code></td>
+<td>窗重叠比例，<code>0 ≤ value &lt; 1</code></td>
+</tr>
+<tr>
+<td><code>processing_window</code></td>
+<td><code>None</code></td>
+<td>有效窗为 max(指定值或0.5, 1.5×EEG通道数/sfreq) 秒</td>
+</tr>
+<tr>
+<td><code>step_size</code></td>
+<td><code>None</code></td>
+<td>更新步长（采样点）；默认 floor(sfreq×有效窗/2)，不得超过有效窗样本数</td>
+</tr>
+<tr>
+<td><code>max_dimensions</code></td>
+<td><code>0.66</code></td>
+<td>最多重建维度比例，严格介于 0 与 1</td>
+</tr>
+<tr>
+<td><code>max_memory_mb</code></td>
+<td><code>64.0</code></td>
+<td>分块预算；会影响计算分块/更新边界，不保证调低后数值不变</td>
+</tr>
+<tr>
+<td><code>amplification_limit</code></td>
+<td><code>100.0</code></td>
+<td>变换后/前 RMS 放大比的数值异常保护上限</td>
+</tr>
+</tbody>
+</table>
+<p>生效的窗长、内存预算和放大上限为正数。<code>cutoff</code> 与 <code>min_segment_seconds</code> 使用顶层 <code>asr_cutoff</code> 与 <code>min_training_seconds</code>；若放入该字典则忽略并记录。默认门槛组可以直接用 <code>asr_options=None</code>，无需展开十个键。</p>
+<pre><code class="language-python">config = PipelineConfig(asr_cutoff=20.0,
+    asr_options={&quot;reference_window&quot;: 1.0, &quot;calibration_window&quot;: 0.5})
+</code></pre>
+<h2>独立分段配置：12 个字段</h2>
+<p>通过 <code>from eegproc.epochs import EpochConfig</code> 导入，并作为 <code>run(..., epoch_config=...)</code> 参数传入。未提供时，前七项及 seed 由顶层分段/QC/seed 字段生成。提供 <code>EpochConfig</code> 对象时是完整分段配置覆盖，不是只覆盖你填写的字段；也可提供字典仅覆盖列出的字段。无效字段回到解析后的分段默认值并记录。固定分段的时间窗/基线仍由 fixed 设置决定。</p>
+<table>
+<thead>
+<tr>
+<th>EpochConfig 字段</th>
+<th>构造默认</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>tmin</code></td>
+<td><code>-0.2</code></td>
+<td>分段起点</td>
+</tr>
+<tr>
+<td><code>tmax</code></td>
+<td><code>1.0</code></td>
+<td>分段终点</td>
+</tr>
+<tr>
+<td><code>baseline</code></td>
+<td><code>(None, 0.0)</code></td>
+<td>基线区间；None 关闭</td>
+</tr>
+<tr>
+<td><code>peak_uv</code></td>
+<td><code>150.0</code></td>
+<td>试次绝对幅值门槛</td>
+</tr>
+<tr>
+<td><code>ptp_uv</code></td>
+<td><code>200.0</code></td>
+<td>试次峰峰值门槛</td>
+</tr>
+<tr>
+<td><code>robust_z</code></td>
+<td><code>6.0</code></td>
+<td>试次相对异常门槛</td>
+</tr>
+<tr>
+<td><code>relative_min_ptp_uv</code></td>
+<td><code>50.0</code></td>
+<td>相对异常同时要求的峰峰值下限</td>
+</tr>
+<tr>
+<td><code>max_interpolate</code></td>
+<td><code>4</code></td>
+<td>局部修复单次最多插值导数</td>
+</tr>
+<tr>
+<td><code>max_local_fraction</code></td>
+<td><code>0.125</code></td>
+<td>局部修复最多导数比例；有效值 &gt;0 且 ≤0.25</td>
+</tr>
+<tr>
+<td><code>min_fit_epochs</code></td>
+<td><code>10</code></td>
+<td>拟合局部修复所需最少 eligible epochs，须 ≥cv</td>
+</tr>
+<tr>
+<td><code>cv</code></td>
+<td><code>5</code></td>
+<td>修复交叉验证折数，有效值 ≥2</td>
+</tr>
+<tr>
+<td><code>seed</code></td>
+<td><code>20261018</code></td>
+<td>分段修复随机种子</td>
+</tr>
+</tbody>
+</table>
+<p>四个修复控制项只在 repair_epochs=True 时生效。实际插值上限为 <code>min(max_interpolate, floor(nEEG×max_local_fraction))</code>。局部修复只修改分段数据，不覆盖连续 Raw。</p>
+<pre><code class="language-python">from eegproc.epochs import EpochConfig
+epoch_config = EpochConfig(tmin=-0.2, tmax=0.8, ptp_uv=180.0)
+result = run(raw, &quot;outputs/sub01_erp&quot;, &quot;sub01&quot;, purpose=&quot;erp&quot;,
+             task_name=&quot;oddball&quot;, epoch_mode=&quot;events&quot;, epoch_config=epoch_config,
+             events=events, event_id={&quot;standard&quot;: 1, &quot;target&quot;: 2})
+</code></pre>
+<h2>run 的运行输入</h2>
+<p>这些参数属于函数调用，不放进 PipelineConfig。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>raw</code></td>
+<td>必填</td>
+<td>连续 MNE Raw，包含正确单位、通道类型、坐标与时间信息</td>
+</tr>
+<tr>
+<td><code>save_path</code></td>
+<td>必填</td>
+<td>输出目录；既有同名输出会被拒绝覆盖</td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td>必填</td>
+<td>安全文件名前缀；与 task_name 分开</td>
+</tr>
+<tr>
+<td><code>config</code></td>
+<td><code>None</code></td>
+<td>PipelineConfig、字典或 JSON 路径</td>
+</tr>
+<tr>
+<td><code>config_file</code></td>
+<td><code>None</code></td>
+<td>可选 JSON 基础配置；先读取此文件，再应用 config 和直接关键字</td>
+</tr>
+<tr>
+<td><code>montage</code></td>
+<td><code>None</code></td>
+<td>显式设置/覆盖电极位置；None 沿用 Raw</td>
+</tr>
+<tr>
+<td><code>collect_stages</code></td>
+<td><code>False</code></td>
+<td>True 返回中间阶段内存副本、增加内存，不写阶段文件；非法类型回到 False 并记录</td>
+</tr>
+<tr>
+<td><code>events</code></td>
+<td><code>None</code></td>
+<td><code>(n_events,3)</code> 整数事件数组，样本号包括 first_samp</td>
+</tr>
+<tr>
+<td><code>event_id</code></td>
+<td><code>None</code></td>
+<td>条件名称到整数事件码的映射</td>
+</tr>
+<tr>
+<td><code>epoch_config</code></td>
+<td><code>None</code></td>
+<td>上述 EpochConfig 的完整分段覆盖；字典可只覆盖列出的字段</td>
+</tr>
+<tr>
+<td><code>invocation</code></td>
+<td><code>None</code></td>
+<td>高级溯源映射；一般不用设置，非法类型改用默认 Python API 溯源并记录</td>
+</tr>
+</tbody>
+</table>
+<p><code>**parameters</code> 接收主表 75 字段的直接关键字。没有“仅保存 HTML”“保存每一阶段”或选择删除原始人工 BAD 的主流程参数；当前固定保存必要结果和 ICA 断点。没有 ECG 通道名配置：先将实际 ECG 通道类型设为 <code>ecg</code>，程序自动使用有效通道。</p>
+<h2>resume 与报告重建</h2>
+<table>
+<thead>
+<tr>
+<th>resume 参数</th>
+<th>默认</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>checkpoint</code></td>
+<td>必填</td>
+<td>原 checkpoint.json</td>
+</tr>
+<tr>
+<td><code>save_path</code></td>
+<td>必填</td>
+<td>独立的新输出目录</td>
+</tr>
+<tr>
+<td><code>subject</code></td>
+<td><code>None</code></td>
+<td>输出前缀，None 沿用断点</td>
+</tr>
+<tr>
+<td><code>selection_json</code></td>
+<td><code>None</code></td>
+<td>HTML 下载的确认选择文件，与 exclude 二选一</td>
+</tr>
+<tr>
+<td><code>exclude</code></td>
+<td><code>None</code></td>
+<td>完整 0-based 剔除名单；[] 全保留，与 selection_json 二选一</td>
+</tr>
+<tr>
+<td><code>reviewer</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>复核者</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>复核理由</td>
+</tr>
+<tr>
+<td><code>collect_stages</code></td>
+<td><code>False</code></td>
+<td>True 额外返回内存阶段副本；非法类型回到 False 并记录</td>
+</tr>
+<tr>
+<td><code>original_raw</code></td>
+<td><code>None</code></td>
+<td>原输入 Raw，内存输入续处理时提供</td>
+</tr>
+<tr>
+<td><code>original_fif</code></td>
+<td><code>None</code></td>
+<td>原输入 FIF 的新路径，移动原文件后提供</td>
+</tr>
+</tbody>
+</table>
+<p>续处理不接收新滤波/ASR/ICA 拟合参数；其作用是用同一分解应用新名单。<code>render_report(source, report_path)</code> 仅有两个必填输入：已有 PipelineResult 或 HTML、以及新的 HTML 路径。</p>
+<h2>独立数据准备接口</h2>
+<p><code>from eegproc.preparation import prepare_data</code>。这部分负责输入准备，不属于预处理算法配置。</p>
+<table>
+<thead>
+<tr>
+<th>prepare_data 参数</th>
+<th>默认</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>source</code></td>
+<td>必填</td>
+<td>Neuracle 文件夹，或 FIF/EDF/BDF/VHDR/SET 文件</td>
+</tr>
+<tr>
+<td><code>output_fif</code></td>
+<td><code>None</code></td>
+<td>可选保存准备后 FIF；指定时还保存准备与事件 JSON</td>
+</tr>
+<tr>
+<td><code>channel_types</code></td>
+<td><code>None</code></td>
+<td>如 <code>{&quot;ECG&quot;: &quot;ecg&quot;, &quot;HEOG&quot;: &quot;eog&quot;}</code></td>
+</tr>
+<tr>
+<td><code>rename</code></td>
+<td><code>None</code></td>
+<td>通道重命名字典</td>
+</tr>
+<tr>
+<td><code>drop</code></td>
+<td><code>()</code></td>
+<td>明确移除的通道名列表</td>
+</tr>
+<tr>
+<td><code>montage</code></td>
+<td><code>None</code></td>
+<td>实际电极布局/坐标</td>
+</tr>
+<tr>
+<td><code>event_id</code></td>
+<td><code>None</code></td>
+<td>注释到事件码的映射</td>
+</tr>
+<tr>
+<td><code>allow_legacy_uv_per_mm</code></td>
+<td><code>False</code></td>
+<td>仅 Neuracle 目录的旧标定兼容开关</td>
+</tr>
+<tr>
+<td><code>return_result</code></td>
+<td><code>False</code></td>
+<td>False 返回 Raw；True 返回含事件、溯源和输出路径的 PreparationResult</td>
+</tr>
+</tbody>
+</table>
+<h2>EEGLAB 参数预设</h2>
+<p><code>preset=&quot;eeglab&quot;</code> 在同一流程中设置下列值，不调用 MATLAB；用户显式传入的参数仍可覆盖它们。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>eeglab 预设</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>highpass</code>, <code>lowpass</code></td>
+<td><code>0.5</code>, <code>100.0</code></td>
+</tr>
+<tr>
+<td><code>training_highpass</code>, <code>training_lowpass</code></td>
+<td><code>0.5</code>, <code>100.0</code></td>
+</tr>
+<tr>
+<td><code>filter_method</code></td>
+<td><code>&quot;eeglab_fir&quot;</code></td>
+</tr>
+<tr>
+<td><code>channel_method</code></td>
+<td><code>&quot;eegprep&quot;</code></td>
+</tr>
+<tr>
+<td><code>asr_cutoff</code></td>
+<td><code>20.0</code></td>
+</tr>
+<tr>
+<td><code>ica_method</code></td>
+<td><code>&quot;infomax&quot;</code></td>
+</tr>
+<tr>
+<td><code>ica_max_iter</code></td>
+<td><code>4096</code></td>
+</tr>
+<tr>
+<td><code>rank_method</code></td>
+<td><code>&quot;covariance&quot;</code></td>
+</tr>
+<tr>
+<td><code>ica_rule</code></td>
+<td><code>&quot;class_max&quot;</code></td>
+</tr>
+</tbody>
+</table>
+<p>其余字段沿用共同默认值；purpose 和 task_name 的用途/命名含义不变。</p>
+<h2>查看实际生效参数</h2>
+<pre><code class="language-python">from dataclasses import asdict
+from pprint import pprint
+from eegproc import PipelineConfig
+
+pprint(asdict(PipelineConfig()))
+pprint(asdict(PipelineConfig(purpose=&quot;erp&quot;)))
+pprint(asdict(PipelineConfig(preset=&quot;eeglab&quot;)))
+# 运行后，以 result.report[&quot;config&quot;] 查看本次实际生效主配置。
+# 所有自动调整：result.report[&quot;parameter_adjustments&quot;]。
+</code></pre>
+<p>核对来源：<a href="../eegproc/settings.py">主字段与预设</a>、<a href="../eegproc/parameter_resolution.py">自动修正规则</a>、<a href="../eegproc/runtime_parameters.py">输入相关参数</a>、<a href="../eegproc/configuration.py">校验/覆盖/事件规则</a>、<a href="../eegproc/api.py">公共 API</a>、<a href="../eegproc/stages.py">阶段实现</a>、<a href="../eegproc/backends.py">后端参数作用</a>、<a href="../eegproc/ica.py">ICA 规则</a>、<a href="../eegproc/mne_asr/api.py">ASR 高级字段</a>、<a href="../eegproc/epochs.py">EpochConfig</a>、<a href="../eegproc/preparation.py">数据准备</a>。</p>
+</body></html>

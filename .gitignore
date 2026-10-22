@@ -1,0 +1,30 @@
+__pycache__/
+.pytest_cache/
+*.py[cod]
+.venv/
+build/
+dist/
+*.egg-info/
+outputs/
+data/
+.cleanup_work/
+_待手动删除_*/
+.validation_work/
+*.log
+
+# Local research records and release working copies are not source code.
+.work/
+results/
+release/
+test_data/
+test data/
+/resources/
+*.bdf
+*.edf
+*.fif
+!tests/fixtures/staged_v3/input_raw.fif
+!tests/fixtures/staged_v3/p16_rest_cont_raw.fif
+!tests/fixtures/staged_v3/p16_erp_cont_raw.fif
+.env
+.env.*
+!.env.example
