@@ -2,6 +2,8 @@
 
 [首页](../../README.zh-CN.md) · [English](../en/usage.md) · [参数说明](parameters.md) · [结果解读](results.md)
 
+[处理流程图](workflow.md) 展示实际处理顺序、分析与 ICA 分支、人工复核路径和产出文件。
+
 示例中的相对路径以启动 Python 时的目录为起点。请按真实记录修改文件路径、通道名称和条件编码。每次运行使用新的输出目录或 subject 标签。
 
 ## 可直接执行的示例

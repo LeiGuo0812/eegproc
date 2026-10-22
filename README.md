@@ -1,28 +1,22 @@
 # eegproc
 
-[中文](README.zh-CN.md) · **0.4.0a1** · [GitHub](https://github.com/LeiGuo0812/eegproc)
+[中文](README.zh-CN.md) · [GitHub](https://github.com/LeiGuo0812/eegproc)
 
-EEG preprocessing with MNE Raw input, native ASR, ICLabel-assisted ICA, reversible component review, event-level quality control, and a self-contained HTML report. Python parameters are the primary interface; JSON and the command line are optional adapters.
+eegproc preprocesses resting-state and task EEG through MNE. It accepts continuous Raw data and combines line-noise removal, bad-channel detection, ASR, ICLabel-assisted ICA, and continuous or event-level quality control. Results include MNE FIF data and a self-contained HTML report with editable ICA selections.
 
-## Install
+Configure the workflow directly in Python, or use JSON and the command line. Every ICA run keeps a checkpoint for revising component exclusions without repeating the decomposition.
 
-Use **Python 3.12** for the complete feature set. Install from GitHub in an activated virtual environment:
+## Installation
+
+Use **Python 3.12** and an activated virtual environment:
 
 ```bash
 python -m pip install "eegproc @ git+https://github.com/LeiGuo0812/eegproc.git"
 ```
 
-Or download/clone this repository, enter its root directory, and run:
+From a downloaded or cloned repository, run `python -m pip install -r requirements.txt` in its root directory. `requirements-all.txt` adds all optional runtime backends. See [installation](docs/en/installation.md) for Windows, Linux, macOS and dependency options.
 
-```bash
-python -m pip install -r requirements.txt
-# All optional runtime backends:
-python -m pip install -r requirements-all.txt
-```
-
-The distribution and import name are both `eegproc`. MATLAB is not required. The commands above install from GitHub/source; they do not assume a PyPI release. See the [installation tutorial](docs/en/installation.md) for Windows, Linux, macOS, optional dependencies, pinned revisions, and verification.
-
-## First run
+## Quick start
 
 ```python
 import mne
@@ -30,78 +24,86 @@ from eegproc import run
 
 raw = mne.io.read_raw_fif("prepared/sub01_raw.fif", preload=False)
 result = run(
-    raw,
-    save_path="outputs/sub01_rest",
-    subject="sub01",
-    purpose="rest",
-    task_name="eyes_closed",
+    raw, save_path="outputs/sub01_rest", subject="sub01",
+    purpose="rest", task_name="eyes_closed",
 )
-print(result.status)
-print(result.outputs["quality_report"])
 clean_raw = result.raw
+print(result.status, result.outputs["quality_report"])
 ```
 
-Prepare correct SI units, channel types, electrode locations, and event timing before processing. `purpose` selects analysis defaults; `task_name` records the task label. Original manual BAD annotations and auxiliary channels are retained. Inspect the report before accepting a recording for analysis.
+Prepare EEG/EOG/ECG in volts, electrode coordinates in metres, and correct channel types, montage and event timing. Device conversion is handled separately by `eegproc.preparation.prepare_data`. The input Raw is not modified; original BAD annotations and auxiliary samples are retained.
 
-| Default | Rest | ERP |
+For a task recording with stimulus annotations `"1"` and `"2"`:
+
+```python
+task_raw = mne.io.read_raw_fif("prepared/sub01_task_raw.fif", preload=False)
+events, _ = mne.events_from_annotations(task_raw, event_id={"1": 1, "2": 2})
+erp = run(
+    task_raw, "outputs/sub01_oddball", "sub01",
+    purpose="erp", task_name="oddball",
+    events=events, event_id={"standard": 1, "target": 2},
+    epoch_tmin=-0.2, epoch_tmax=1.0,
+)
+```
+
+`purpose` selects analysis defaults; `task_name` labels the recording. Supplying events requests event epochs. Inspect the HTML report and condition retention before accepting the data for analysis. Use a fresh output directory for each run.
+
+| Standard default | Rest | ERP |
 |---|---|---|
 | Analysis band | 0.5–80 Hz | 0.1–30 Hz |
 | ICA training band | 1–100 Hz | 1–100 Hz |
 | ASR | Enabled; cutoff 20 | Enabled; cutoff 20 |
-| ICA | Picard; ICLabel threshold rule | Picard; ICLabel threshold rule |
-| Epoch export | Only when requested | Only when requested |
+| ICA / automatic selection | Picard / ICLabel thresholds | Picard / ICLabel thresholds |
+| Epoch export | When requested | When requested |
 | Report waveform window | 4 s | 4 s |
 
-`preset="eeglab"` changes parameters within the same workflow. It approximates the original EEGLAB script in Python; it is not numerical MATLAB reproduction. All settings are listed in the [parameter reference](docs/en/parameters.md).
-
-## Workflow and files
+## Workflow and outputs
 
 ```mermaid
 flowchart LR
-    A[Device data] --> B[Separate preparation]
-    B --> C[MNE Raw]
-    C --> D[Line noise and channels]
-    D --> E[Reference, filters and ASR]
-    E --> F[ICA fit and pre-subtraction checkpoint]
-    F --> G[Automatic or manual IC selection]
-    G --> H[Reconstruction and continuous QC]
-    H --> I[Optional epoch QC]
-    I --> J[Clean FIF, ICA and HTML]
-    F --> K[HTML review]
-    K -->|Resume without refitting| G
+    A[MNE Raw] --> B[Line noise and bad channels]
+    B --> C[Reference, filters and ASR]
+    C --> D[ICA fit and checkpoint]
+    D --> E[Automatic or manual IC selection]
+    E --> F[Reconstruction and continuous QC]
+    F --> G[Optional epoch QC]
+    G --> H[Clean FIF, ICA and HTML]
+    D --> I[HTML review]
+    I -->|Resume without refitting| E
 ```
 
 ```text
 outputs/sub01_rest/
-├── sub01_cont_raw.fif
-├── sub01-ica.fif
-├── sub01_report.html
+├── sub01_cont_raw.fif          Cleaned continuous data
+├── sub01-ica.fif               ICA model and final exclusions
+├── sub01_report.html           Figures, QC, settings and provenance
 └── sub01_ica_review/
-    ├── pre_ica_raw.fif
-    ├── decomposition-ica.fif
-    └── checkpoint.json
+    ├── pre_ica_raw.fif         Data before component subtraction
+    ├── decomposition-ica.fif   Frozen ICA decomposition
+    └── checkpoint.json        Continuation state
 ```
 
-Requested epochs add `sub01_clean-epo.fif` when at least one trial survives. Figures and tables are embedded in the HTML. Each ICA run retains the pre-subtraction checkpoint, so a revised IC list can restore previously removed components without repeating filtering, ASR, or ICA fitting. See [ICA review and continuation](docs/en/usage.md#ica-review-and-continuation).
+Requested epochs add `sub01_clean-epo.fif` when trials remain. Report figures and tables are embedded in the HTML. Continuous BAD annotations mark problematic intervals without deleting samples.
+
+To review before subtraction, set `ica_mode="review"`. To revise an automatic result, open its report and change **Exclude** on an IC tile or its detail view. Download the selection and call `resume()` with the checkpoint. A new complete list can restore previously removed components; filtering, ASR and ICA fitting are reused. Keep the original prepared input and all checkpoint files. See [ICA review and continuation](docs/en/usage.md#ica-review-and-continuation).
 
 ## Documentation
 
 | Topic | English | 中文 |
 |---|---|---|
-| Installation and verification | [Installation](docs/en/installation.md) | [安装教程](docs/zh-CN/installation.md) |
-| Preparation, rest, ERP, batch, ICA review, CLI | [Complete usage](docs/en/usage.md) | [完整使用示例](docs/zh-CN/usage.md) |
-| Every parameter and its dependencies | [Parameters](docs/en/parameters.md) | [参数说明](docs/zh-CN/parameters.md) |
-| Report, outputs, BAD labels and decisions | [Interpreting results](docs/en/results.md) | [结果解读](docs/zh-CN/results.md) |
+| Installation and dependencies | [Installation](docs/en/installation.md) | [安装教程](docs/zh-CN/installation.md) |
+| Processing stages and file delivery | [Workflow diagrams](docs/en/workflow.md) | [处理流程图](docs/zh-CN/workflow.md) |
+| Preparation, rest, ERP, batch, ICA review and CLI | [Complete usage](docs/en/usage.md) | [完整使用示例](docs/zh-CN/usage.md) |
+| Parameters, defaults and dependencies | [Parameters](docs/en/parameters.md) | [参数说明](docs/zh-CN/parameters.md) |
+| Report, BAD labels and acceptance decisions | [Interpreting results](docs/en/results.md) | [结果解读](docs/zh-CN/results.md) |
 | PSD, ERP, time-frequency, connectivity and statistics | [Further analysis](docs/en/analysis.md) | [后续分析建议](docs/zh-CN/analysis.md) |
 
-[Executable examples](examples) · [Architecture](docs/ARCHITECTURE.md) · [Release audit](docs/RELEASE_AUDIT.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
-
-Run a complete synthetic example without downloading a dataset:
+Run the [synthetic example](examples/synthetic_demo.py) from a repository checkout to explore rest, ERP and ICA continuation:
 
 ```bash
 python examples/synthetic_demo.py --output outputs/demo
 ```
 
-This exercises rest, ERP, ICA review, continuation and report rebuilding. [Example figures and their interpretation](docs/en/results.md#synthetic-example) are included in the guide. They demonstrate software use, not comparative denoising accuracy.
+More [executable examples](examples) cover real-data preparation, batch processing and downstream analysis.
 
-This alpha research package is released under the [BSD 3-Clause license](LICENSE), with separately retained [third-party terms](docs/THIRD_PARTY_NOTICES.md). Validation evidence is recorded in the release audit. Preserve each run's effective settings, software versions, prepared input, and ICA checkpoint.
+Licensed under [BSD 3-Clause](LICENSE); see [third-party notices](docs/THIRD_PARTY_NOTICES.md) for included components.

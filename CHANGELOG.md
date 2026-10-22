@@ -7,6 +7,8 @@
   imports as compatibility aliases to the same implementation.
 - Add English and Simplified Chinese installation, complete parameter,
   usage, report interpretation and downstream analysis guides.
+- Add bilingual diagrams for processing stages, ICA review/continuation and
+  input/output files, including the shared analysis/ICA data path.
 - Add runnable synthetic and real-input examples. No data download is required
   for the synthetic demonstration.
 - License project-owned code under BSD-3-Clause; retain original third-party

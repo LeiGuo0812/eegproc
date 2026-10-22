@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "files": 188,
-  "source_bytes": 5010724,
+  "files": 190,
+  "source_bytes": 5028701,
   "destination": "release/eegproc",
   "dry_run": false,
   "excluded": [
@@ -15,8 +15,8 @@
     "historical reports",
     "obsolete CleanLine license (no CleanLine code bundled)"
   ],
-  "created_utc": "2026-10-22T15:51:18.534581+00:00",
-  "staged_bytes": 5004198,
+  "created_utc": "2026-10-22T16:05:06.923153+00:00",
+  "staged_bytes": 5022175,
   "artifacts": [
     {
       "path": ".gitattributes",
@@ -41,9 +41,44 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 1333,
-      "source_sha256": "98e76605979c5ab507df7aed4357b4ecbbf92e97ea57fdaf1450aaec4e567287",
-      "sha256": "98e76605979c5ab507df7aed4357b4ecbbf92e97ea57fdaf1450aaec4e567287",
+      "bytes": 1478,
+      "source_sha256": "a14b5bdc639c1b67211cd03913b0e3a0c6ce262ae345cf308caee502f81857c8",
+      "sha256": "a14b5bdc639c1b67211cd03913b0e3a0c6ce262ae345cf308caee502f81857c8",
+      "transformation": null
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 1528,
+      "source_sha256": "ece9b281ff426ebd869188c357abad6be7d39b4706ba69d0aef49dc8ee85618f",
+      "sha256": "ece9b281ff426ebd869188c357abad6be7d39b4706ba69d0aef49dc8ee85618f",
+      "transformation": null
+    },
+    {
+      "path": "MANIFEST.in",
+      "bytes": 2016,
+      "source_sha256": "2f3366dcfb42dd6b857c9b33d18e632a47065efbd0a4ab2c74745dc2c8d8fcc9",
+      "sha256": "2f3366dcfb42dd6b857c9b33d18e632a47065efbd0a4ab2c74745dc2c8d8fcc9",
+      "transformation": null
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 951,
+      "source_sha256": "d6f13b7163131fe3f9e2e3013a5a3ae9b4d6a39691248c14eaa493829f801f96",
+      "sha256": "d6f13b7163131fe3f9e2e3013a5a3ae9b4d6a39691248c14eaa493829f801f96",
+      "transformation": null
+    },
+    {
+      "path": "README.md",
+      "bytes": 5485,
+      "source_sha256": "8507111d1588a0c2511d373876576e169dd2312548821a14939dc8c78b15240e",
+      "sha256": "8507111d1588a0c2511d373876576e169dd2312548821a14939dc8c78b15240e",
+      "transformation": null
+    },
+    {
+      "path": "README.zh-CN.md",
+      "bytes": 5196,
+      "source_sha256": "ce624bfe78410ebb93d0463dae080c316805dee3dc94c99fe87f558b46c926ee",
+      "sha256": "ce624bfe78410ebb93d0463dae080c316805dee3dc94c99fe87f558b46c926ee",
       "transformation": null
     },
     {
@@ -94,6 +129,41 @@
       "source_sha256": "766e9e9204c93e0e0880b01f8969db9d40447a1a365a1fb4911ee43e814f83d2",
       "sha256": "4f55b2350147c6384071cca3df0643cde8fe73f62de64a178a3610bcc4bab5d8",
       "transformation": "Removed links to historical local evidence excluded from the release allowlist."
+    },
+    {
+      "path": "docs/INSTALLATION.md",
+      "bytes": 379,
+      "source_sha256": "10f1657738a0316b7da3d89850d6c4d8e45d375702dc0537d0734085e5fc0658",
+      "sha256": "10f1657738a0316b7da3d89850d6c4d8e45d375702dc0537d0734085e5fc0658",
+      "transformation": null
+    },
+    {
+      "path": "docs/PARAMETERS.html",
+      "bytes": 39996,
+      "source_sha256": "07417c1bd77c830a97bf254b8b843744443fc8b717b933219050d19610936799",
+      "sha256": "07417c1bd77c830a97bf254b8b843744443fc8b717b933219050d19610936799",
+      "transformation": null
+    },
+    {
+      "path": "docs/PARAMETERS.md",
+      "bytes": 26909,
+      "source_sha256": "16129d5bd591349105ce9a4b910257196e8554fabf99e33927b3f8fca3284480",
+      "sha256": "16129d5bd591349105ce9a4b910257196e8554fabf99e33927b3f8fca3284480",
+      "transformation": null
+    },
+    {
+      "path": "docs/RELEASE_AUDIT.md",
+      "bytes": 13721,
+      "source_sha256": "499f4a81482af0a4cc8d5b77d933f9aea4c3539b023d6463506f8673455588a1",
+      "sha256": "499f4a81482af0a4cc8d5b77d933f9aea4c3539b023d6463506f8673455588a1",
+      "transformation": null
+    },
+    {
+      "path": "docs/THIRD_PARTY_NOTICES.md",
+      "bytes": 3422,
+      "source_sha256": "ed562d8b9c5bf2e956ac153d36665ca54d7c0a044980abcb1764456b93fb12a3",
+      "sha256": "ed562d8b9c5bf2e956ac153d36665ca54d7c0a044980abcb1764456b93fb12a3",
+      "transformation": null
     },
     {
       "path": "docs/assets/README.md",
@@ -153,44 +223,16 @@
     },
     {
       "path": "docs/en/usage.md",
-      "bytes": 17888,
-      "source_sha256": "ee2e1f178da27a90b6c143e9d23c12d36b222e94e98f127bbf14583e1d529d7f",
-      "sha256": "ee2e1f178da27a90b6c143e9d23c12d36b222e94e98f127bbf14583e1d529d7f",
+      "bytes": 18008,
+      "source_sha256": "8c3ce10277ebc9f98087b20f7f4b212ae80a39924ac9564ae541f215777ec887",
+      "sha256": "8c3ce10277ebc9f98087b20f7f4b212ae80a39924ac9564ae541f215777ec887",
       "transformation": null
     },
     {
-      "path": "docs/INSTALLATION.md",
-      "bytes": 379,
-      "source_sha256": "10f1657738a0316b7da3d89850d6c4d8e45d375702dc0537d0734085e5fc0658",
-      "sha256": "10f1657738a0316b7da3d89850d6c4d8e45d375702dc0537d0734085e5fc0658",
-      "transformation": null
-    },
-    {
-      "path": "docs/PARAMETERS.html",
-      "bytes": 39996,
-      "source_sha256": "07417c1bd77c830a97bf254b8b843744443fc8b717b933219050d19610936799",
-      "sha256": "07417c1bd77c830a97bf254b8b843744443fc8b717b933219050d19610936799",
-      "transformation": null
-    },
-    {
-      "path": "docs/PARAMETERS.md",
-      "bytes": 26909,
-      "source_sha256": "16129d5bd591349105ce9a4b910257196e8554fabf99e33927b3f8fca3284480",
-      "sha256": "16129d5bd591349105ce9a4b910257196e8554fabf99e33927b3f8fca3284480",
-      "transformation": null
-    },
-    {
-      "path": "docs/RELEASE_AUDIT.md",
-      "bytes": 13601,
-      "source_sha256": "725497ed0eed216a5abd330c71569ec8ada787a4cbfb12ca59e50d4743abd171",
-      "sha256": "725497ed0eed216a5abd330c71569ec8ada787a4cbfb12ca59e50d4743abd171",
-      "transformation": null
-    },
-    {
-      "path": "docs/THIRD_PARTY_NOTICES.md",
-      "bytes": 3422,
-      "source_sha256": "ed562d8b9c5bf2e956ac153d36665ca54d7c0a044980abcb1764456b93fb12a3",
-      "sha256": "ed562d8b9c5bf2e956ac153d36665ca54d7c0a044980abcb1764456b93fb12a3",
+      "path": "docs/en/workflow.md",
+      "bytes": 8590,
+      "source_sha256": "7a5aa8fe051e7fb478620cb34eb35595792e9c0afbffeffa21565d8aeeeebd42",
+      "sha256": "7a5aa8fe051e7fb478620cb34eb35595792e9c0afbffeffa21565d8aeeeebd42",
       "transformation": null
     },
     {
@@ -223,9 +265,16 @@
     },
     {
       "path": "docs/zh-CN/usage.md",
-      "bytes": 16819,
-      "source_sha256": "9f2ea0fc95a2ae4b5094109e9e60306da9ca16bd369ce62352a8c39c2254703a",
-      "sha256": "9f2ea0fc95a2ae4b5094109e9e60306da9ca16bd369ce62352a8c39c2254703a",
+      "bytes": 16938,
+      "source_sha256": "1b1e3bd22cf743d02f9f93d12f0f061dcf25a44c700573ee173c6043b9cbe0af",
+      "sha256": "1b1e3bd22cf743d02f9f93d12f0f061dcf25a44c700573ee173c6043b9cbe0af",
+      "transformation": null
+    },
+    {
+      "path": "docs/zh-CN/workflow.md",
+      "bytes": 7937,
+      "source_sha256": "b5a1183f4d79d0c2c645816662b49055172834671e65760aa73244559f8fb41d",
+      "sha256": "b5a1183f4d79d0c2c645816662b49055172834671e65760aa73244559f8fb41d",
       "transformation": null
     },
     {
@@ -460,6 +509,13 @@
       "transformation": null
     },
     {
+      "path": "eegproc/RELEASE_STATUS.md",
+      "bytes": 874,
+      "source_sha256": "8748a45f8ff969746d49f313ccac98f56826fdc76d70e81c226b33cbebbee517",
+      "sha256": "8748a45f8ff969746d49f313ccac98f56826fdc76d70e81c226b33cbebbee517",
+      "transformation": null
+    },
+    {
       "path": "eegproc/__init__.py",
       "bytes": 314,
       "source_sha256": "ee655f2333218c4836e31d36c9f1713b2a5d7775ded654b325f32b3a0f336c97",
@@ -586,6 +642,27 @@
       "transformation": null
     },
     {
+      "path": "eegproc/mne_asr/LICENSE",
+      "bytes": 1349,
+      "source_sha256": "69bfeb82fa065b417f6a8806c5a01833c5edbadbf0736f0a68f23af00a6f93fa",
+      "sha256": "69bfeb82fa065b417f6a8806c5a01833c5edbadbf0736f0a68f23af00a6f93fa",
+      "transformation": null
+    },
+    {
+      "path": "eegproc/mne_asr/PROVENANCE.json",
+      "bytes": 1655,
+      "source_sha256": "2b97b4082f7a5a42e8ad25f039f22870f532f7bb573bd241eff741602040848d",
+      "sha256": "2b97b4082f7a5a42e8ad25f039f22870f532f7bb573bd241eff741602040848d",
+      "transformation": null
+    },
+    {
+      "path": "eegproc/mne_asr/README.md",
+      "bytes": 4841,
+      "source_sha256": "6a73fbbedffd5cb1b65001b4aff9d415496544a555bea7224e491571619a4340",
+      "sha256": "6a73fbbedffd5cb1b65001b4aff9d415496544a555bea7224e491571619a4340",
+      "transformation": null
+    },
+    {
       "path": "eegproc/mne_asr/__init__.py",
       "bytes": 273,
       "source_sha256": "ffbf4b911b736ca3855690f7ef325d42d4a61207f3fbe82758bc6dfcdd2a9477",
@@ -649,27 +726,6 @@
       "transformation": null
     },
     {
-      "path": "eegproc/mne_asr/LICENSE",
-      "bytes": 1349,
-      "source_sha256": "69bfeb82fa065b417f6a8806c5a01833c5edbadbf0736f0a68f23af00a6f93fa",
-      "sha256": "69bfeb82fa065b417f6a8806c5a01833c5edbadbf0736f0a68f23af00a6f93fa",
-      "transformation": null
-    },
-    {
-      "path": "eegproc/mne_asr/PROVENANCE.json",
-      "bytes": 1655,
-      "source_sha256": "2b97b4082f7a5a42e8ad25f039f22870f532f7bb573bd241eff741602040848d",
-      "sha256": "2b97b4082f7a5a42e8ad25f039f22870f532f7bb573bd241eff741602040848d",
-      "transformation": null
-    },
-    {
-      "path": "eegproc/mne_asr/README.md",
-      "bytes": 4841,
-      "source_sha256": "6a73fbbedffd5cb1b65001b4aff9d415496544a555bea7224e491571619a4340",
-      "sha256": "6a73fbbedffd5cb1b65001b4aff9d415496544a555bea7224e491571619a4340",
-      "transformation": null
-    },
-    {
       "path": "eegproc/parameter_resolution.py",
       "bytes": 11552,
       "source_sha256": "43313a9703d5755763c708056b6b5ced3fe9115a8e74061570a2a2a64e1556ca",
@@ -712,13 +768,6 @@
       "transformation": null
     },
     {
-      "path": "eegproc/RELEASE_STATUS.md",
-      "bytes": 874,
-      "source_sha256": "8748a45f8ff969746d49f313ccac98f56826fdc76d70e81c226b33cbebbee517",
-      "sha256": "8748a45f8ff969746d49f313ccac98f56826fdc76d70e81c226b33cbebbee517",
-      "transformation": null
-    },
-    {
       "path": "eegproc/report_layout.py",
       "bytes": 11159,
       "source_sha256": "37bd11c005cc13917418cc892076afe7ab180be2993c454b046f720d1db10fbd",
@@ -740,13 +789,6 @@
       "transformation": null
     },
     {
-      "path": "eegproc/resources/__init__.py",
-      "bytes": 67,
-      "source_sha256": "511345afb2ef8dab8e5c701684b35c834e40fa19bb91c638dc7e25cc15252727",
-      "sha256": "511345afb2ef8dab8e5c701684b35c834e40fa19bb91c638dc7e25cc15252727",
-      "transformation": null
-    },
-    {
       "path": "eegproc/resources/LICENSE-MNE.txt",
       "bytes": 1467,
       "source_sha256": "adf6b228c93126d67e84c40ed7c1b1dbf1ec44f26d9fe224261e1d8592646b52",
@@ -758,6 +800,13 @@
       "bytes": 1679,
       "source_sha256": "cd2fecb621535e6293ce38dc87fbb37e0d7649cf5fc367cf0356f953fcb2cef7",
       "sha256": "cd2fecb621535e6293ce38dc87fbb37e0d7649cf5fc367cf0356f953fcb2cef7",
+      "transformation": null
+    },
+    {
+      "path": "eegproc/resources/__init__.py",
+      "bytes": 67,
+      "source_sha256": "511345afb2ef8dab8e5c701684b35c834e40fa19bb91c638dc7e25cc15252727",
+      "sha256": "511345afb2ef8dab8e5c701684b35c834e40fa19bb91c638dc7e25cc15252727",
       "transformation": null
     },
     {
@@ -845,20 +894,6 @@
       "transformation": null
     },
     {
-      "path": "LICENSE",
-      "bytes": 1528,
-      "source_sha256": "ece9b281ff426ebd869188c357abad6be7d39b4706ba69d0aef49dc8ee85618f",
-      "sha256": "ece9b281ff426ebd869188c357abad6be7d39b4706ba69d0aef49dc8ee85618f",
-      "transformation": null
-    },
-    {
-      "path": "MANIFEST.in",
-      "bytes": 2016,
-      "source_sha256": "2f3366dcfb42dd6b857c9b33d18e632a47065efbd0a4ab2c74745dc2c8d8fcc9",
-      "sha256": "2f3366dcfb42dd6b857c9b33d18e632a47065efbd0a4ab2c74745dc2c8d8fcc9",
-      "transformation": null
-    },
-    {
       "path": "mne_asr/__init__.py",
       "bytes": 544,
       "source_sha256": "2578f7052891147c6ec4964fc3766f69d5bd39ebcde5ffac85b1fa56d83b6778",
@@ -877,13 +912,6 @@
       "bytes": 161,
       "source_sha256": "646b96eb0913f0a04ee3f2407d5e43844b7f3146997f8973229ea6b2d1266bfd",
       "sha256": "646b96eb0913f0a04ee3f2407d5e43844b7f3146997f8973229ea6b2d1266bfd",
-      "transformation": null
-    },
-    {
-      "path": "NOTICE",
-      "bytes": 951,
-      "source_sha256": "d6f13b7163131fe3f9e2e3013a5a3ae9b4d6a39691248c14eaa493829f801f96",
-      "sha256": "d6f13b7163131fe3f9e2e3013a5a3ae9b4d6a39691248c14eaa493829f801f96",
       "transformation": null
     },
     {
@@ -912,20 +940,6 @@
       "bytes": 2345,
       "source_sha256": "6da38bef01935fdf7e0d690c65331020e7d83bcfe27361063d508f3b67b2b357",
       "sha256": "6da38bef01935fdf7e0d690c65331020e7d83bcfe27361063d508f3b67b2b357",
-      "transformation": null
-    },
-    {
-      "path": "README.md",
-      "bytes": 4983,
-      "source_sha256": "0c5d28f49ee112dc5e3418fe1cb57672df7f162b5db66a6cd3bf28582639e90f",
-      "sha256": "0c5d28f49ee112dc5e3418fe1cb57672df7f162b5db66a6cd3bf28582639e90f",
-      "transformation": null
-    },
-    {
-      "path": "README.zh-CN.md",
-      "bytes": 4752,
-      "source_sha256": "1a0aa1900447f27f05b19de50c044967b8e1ff7af3f2097719ab3b88a5914e95",
-      "sha256": "1a0aa1900447f27f05b19de50c044967b8e1ff7af3f2097719ab3b88a5914e95",
       "transformation": null
     },
     {
@@ -1034,6 +1048,13 @@
       "transformation": null
     },
     {
+      "path": "tests/fixtures/staged_v3/README.md",
+      "bytes": 987,
+      "source_sha256": "d6817d770aa8e5296011d85382950b5fd99aadeb8368c394e4940b5477d58395",
+      "sha256": "b811686954e8cf0a551b98826aebe96b811cfdbfc1c785abe190cdf79ba2dbe7",
+      "transformation": "Release fixture documentation; historical metadata sanitization disclosed."
+    },
+    {
       "path": "tests/fixtures/staged_v3/fixture_manifest.json",
       "bytes": 2222,
       "source_sha256": "2c20af726ff1b4a9bfa81cdc1b23a0b2ff6aa89b1d9de29adb67d0bea055c3f7",
@@ -1081,13 +1102,6 @@
       "source_sha256": "c182b123374d6180636e7b23a1a97356eb6e93493a0718b1e836ab5cc2d0658f",
       "sha256": "a540e2c4f20144e4f77539ce324b48ad4c36b835c24c32bc000f042fa8835f8d",
       "transformation": "Historical fixture metadata: removed machine-specific path prefixes."
-    },
-    {
-      "path": "tests/fixtures/staged_v3/README.md",
-      "bytes": 987,
-      "source_sha256": "d6817d770aa8e5296011d85382950b5fd99aadeb8368c394e4940b5477d58395",
-      "sha256": "b811686954e8cf0a551b98826aebe96b811cfdbfc1c785abe190cdf79ba2dbe7",
-      "transformation": "Release fixture documentation; historical metadata sanitization disclosed."
     },
     {
       "path": "tests/report_helpers.py",

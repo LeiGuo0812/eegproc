@@ -2,6 +2,8 @@
 
 [Home](../../README.md) · [中文](../zh-CN/usage.md) · [Parameters](parameters.md) · [Results](results.md)
 
+[Workflow diagrams](workflow.md) show the processing order, analysis/ICA branches, manual review, and delivered files.
+
 Examples use paths relative to the directory where Python is started. Replace recording paths, channel names and condition codes with those from your study. Each run needs a fresh output directory or subject label.
 
 ## Executable examples
