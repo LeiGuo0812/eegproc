@@ -1,6 +1,6 @@
 # Tutorial figures
 
-These three PNG files were generated locally from `examples/synthetic_demo.py` and `examples/analyze_outputs.py` using eegproc 0.4.0a1 and MNE 1.12.1. They contain generated signals, not participant recordings.
+These three PNG files were generated locally from `examples/synthetic_demo.py` and `examples/analyze_outputs.py` using eegproc 0.4.0a2 and MNE 1.12.1. They contain generated signals, not participant recordings.
 
 Reproduce from the repository root after installation:
 

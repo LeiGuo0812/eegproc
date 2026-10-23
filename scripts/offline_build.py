@@ -33,17 +33,17 @@ def inspect_artifacts(wheel, sdist):
         assert 'eegproc/resources/standard_1005.elc' in names
         assert 'eegproc/mne_asr/LICENSE' in names
         assert 'eegproc/mne_asr/PROVENANCE.json' in names
-        assert 'eegproc/RELEASE_STATUS.md' in names
         assert 'eegproc/resources/LICENSE-MNE.txt' in names
         assert 'eegproc/resources/PROVENANCE.json' in names
-        for name in ('prepare_data.py', 'neuracle_io.py', 'eegproc/cli.py'):
+        assert not any(Path(name).parts[0] in {'eeg_pipeline', 'mne_asr'} for name in names)
+        for name in ('eegproc/prepare_cli.py', 'eegproc/io/neuracle.py', 'eegproc/cli.py'):
             assert name in names, name
         metadata_name = next(name for name in names if name.endswith('.dist-info/METADATA'))
         metadata = Parser().parsestr(archive.read(metadata_name).decode('utf-8'))
         entry_name = next(name for name in names if name.endswith('.dist-info/entry_points.txt'))
         entry_points = archive.read(entry_name).decode('utf-8')
         assert 'eegproc = eegproc.cli:main' in entry_points
-        assert 'eegproc-prepare = prepare_data:main' in entry_points
+        assert 'eegproc-prepare = eegproc.prepare_cli:main' in entry_points
         assert 'License :: OSI Approved :: BSD License' in metadata.get_all('Classifier', [])
         project_license = [name for name in names
                            if '.dist-info/' in name and name.endswith('/LICENSE')]
@@ -59,9 +59,10 @@ def inspect_artifacts(wheel, sdist):
         for required in ('pyproject.toml', 'requirements.txt', 'requirements-all.txt',
                          'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE',
                          'docs/en/usage.md', 'docs/zh-CN/usage.md',
-                         'docs/INSTALLATION.md', 'docs/THIRD_PARTY_NOTICES.md',
-                         'tests/fixtures/staged_v3/input_raw.fif'):
+                         'docs/en/workflow.md', 'docs/zh-CN/workflow.md',
+                         'docs/THIRD_PARTY_NOTICES.md'):
             assert required in relative, required
+        assert not any(name.endswith('.fif') for name in relative)
     return {'name': metadata['Name'], 'version': metadata['Version'],
             'requires_python': metadata['Requires-Python'],
             'requires_dist': metadata.get_all('Requires-Dist', []),
@@ -82,10 +83,10 @@ def build(source, output):
     # Fail before creating files if offline tools are unavailable.
     versions = {name: importlib.metadata.version(name) for name in ('setuptools', 'wheel')}
     inputs = {path.relative_to(source).as_posix(): sha256(path)
-              for path in source.rglob('*') if path.is_file()}
+              for path in source.rglob('*') if path.is_file() and not set(path.relative_to(source).parts).intersection({'.git', '__pycache__', '.pytest_cache'})}
     output.mkdir(parents=True)
     scratch = output / 'source'
-    shutil.copytree(source, scratch)
+    shutil.copytree(source, scratch, ignore=shutil.ignore_patterns('.git', '__pycache__', '.pytest_cache'))
     dist = output / 'dist'
     dist.mkdir()
     environment = dict(os.environ, PIP_NO_INDEX='1', PIP_DISABLE_PIP_VERSION_CHECK='1',
@@ -114,7 +115,7 @@ def build(source, output):
     wheel, = dist.glob('*.whl')
     checks = inspect_artifacts(wheel, sdist)
     current = {path.relative_to(source).as_posix(): sha256(path)
-               for path in source.rglob('*') if path.is_file()}
+               for path in source.rglob('*') if path.is_file() and not set(path.relative_to(source).parts).intersection({'.git', '__pycache__', '.pytest_cache'})}
     assert inputs == current, 'Source changed during build'
     summary = dict(status='passed', tools=versions, python=sys.version,
                    installation_performed=False, clean_install_verified=False,

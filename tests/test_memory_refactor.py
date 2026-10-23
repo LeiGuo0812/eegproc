@@ -6,10 +6,10 @@ from mne.utils import object_diff
 from scipy.ndimage import binary_dilation
 from threadpoolctl import threadpool_limits
 
-from eeg_pipeline.raw_helpers import channel_is_finite_nonconstant, concatenate_samples
-from eeg_pipeline.signal_ops import window_mask, relative_window_mask, _training_segments
-from mne_asr import ASRConfig, clean_asr_raw
-from mne_asr.api import _clean_asr_owned
+from eegproc.raw_helpers import channel_is_finite_nonconstant, concatenate_samples
+from eegproc.signal_ops import window_mask, relative_window_mask, _training_segments
+from eegproc.mne_asr import ASRConfig, clean_asr_raw
+from eegproc.mne_asr.api import _clean_asr_owned
 from test_pipeline import fixture
 
 

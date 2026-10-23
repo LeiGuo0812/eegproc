@@ -4,8 +4,8 @@ import html
 import json
 import re
 
-from eeg_pipeline import PipelineConfig
-from eeg_pipeline.quality_report import save_quality_report
+from eegproc import PipelineConfig
+from eegproc.quality_report import save_quality_report
 
 
 def render(tmp_path, **extra):

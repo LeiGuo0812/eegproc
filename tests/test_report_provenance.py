@@ -58,7 +58,7 @@ def test_tables_define_every_column_and_do_not_claim_stale_output_as_current(tmp
 
 def test_provenance_has_source_hashes_without_claiming_bids_or_inventing_command():
     p=capture_provenance(fixture(),'example')
-    assert p['software']['source_files_sha256']['eegproc/pipeline.py']
+    assert p['software']['source_files_sha256']['eegproc/engine.py']
     assert p['software']['packages']['mne']!='not installed'
     assert not p['compliance']['bids_validated'] and p['invocation']['argv'] is None
     assert p['sources']==[]
@@ -66,13 +66,14 @@ def test_provenance_has_source_hashes_without_claiming_bids_or_inventing_command
 
 def test_pipeline_failure_saves_failed_step_without_claiming_unwritten_data(tmp_path,monkeypatch):
     """Fresh output family: collisions are rejected separately before processing."""
-    import eegproc.pipeline as pipeline
+    import eegproc.engine as pipeline
+    from eegproc.settings import config_for
     raw=fixture();unwritten=tmp_path/'failure_cont_raw.fif'
     def fail(*args,**kwargs):raise RuntimeError('controlled ICA failure')
     import eegproc.engine as engine
     monkeypatch.setattr(engine,'fit_ica',fail)
     with pytest.raises(RuntimeError,match='controlled ICA'):
-        pipeline.preprocess_raw(raw,tmp_path,'failure',config=pipeline.config_for(asr_backend='mne_native',asr_cutoff=None,detect_ransac=False))
+        pipeline.preprocess_raw(raw,tmp_path,'failure',config=config_for(asr_backend='mne_native',asr_cutoff=None,detect_ransac=False))
     report=read_report((tmp_path/'failure_report.html').read_text(encoding='utf8'))
     assert report['execution'][-1]['stage']=='ica_fit' and report['execution'][-1]['status']=='failed'
     assert any(s['stage']=='asr' and s['status']=='skipped' for s in report['execution'])

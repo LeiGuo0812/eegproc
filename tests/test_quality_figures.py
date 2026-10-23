@@ -6,8 +6,8 @@ import json
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline.quality_figures import paired_psd,bad_spans,build_signal_figures,retention_rows
-from eeg_pipeline.quality_report import save_quality_report
+from eegproc.quality_figures import paired_psd,bad_spans,build_signal_figures,retention_rows
+from eegproc.quality_report import save_quality_report
 from test_pipeline import fixture
 
 
@@ -45,7 +45,7 @@ def test_condition_counts_and_missing_denominators():
 
 @pytest.mark.parametrize('all_bad',[False,True])
 def test_optional_repair_reports_each_condition_and_manual_bad(all_bad,tmp_path):
-    from eeg_pipeline.epochs import repair_epochs
+    from eegproc.epochs import repair_epochs
     raw=fixture()
     if all_bad:raw.set_annotations(mne.Annotations([0],[40],['BAD_manual']))
     events=np.array([[raw.first_samp+4*256,0,1],[raw.first_samp+10*256,0,2],[raw.first_samp+20*256,0,2]])

@@ -3,9 +3,9 @@ import json
 from pathlib import Path
 import numpy as np
 import pytest
-from eeg_pipeline import PipelineConfig, PipelineResult, resolve_config, run, resume
-from eeg_pipeline.ica import choose_components
-from eeg_pipeline.cli import parser
+from eegproc import PipelineConfig, PipelineResult, resolve_config, run, resume
+from eegproc.ica import choose_components
+from eegproc.cli import parser
 
 
 def test_public_names_and_config_files():

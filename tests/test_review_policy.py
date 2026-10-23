@@ -3,8 +3,10 @@ from report_helpers import read_report
 import json
 import numpy as np
 import pytest
-from eeg_pipeline.pipeline import config_for, assess_bad_channel_burden, preprocess_raw, validate_config
-from eeg_pipeline.quality_report import save_quality_report
+from eegproc.settings import config_for, validate_config
+from eegproc.signal_ops import assess_bad_channel_burden
+from eegproc.engine import preprocess_raw
+from eegproc.quality_report import save_quality_report
 from test_pipeline import fixture
 
 

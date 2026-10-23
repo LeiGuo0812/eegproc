@@ -5,10 +5,10 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline import resolve_config
-from eeg_pipeline.backends import clean_line
-from eeg_pipeline.line_diagnostics import capture_line_input, finish_line_diagnostics
-from eeg_pipeline.quality_figures import line_noise_figure, waveform_figures, style
+from eegproc import resolve_config
+from eegproc.backends import clean_line
+from eegproc.line_diagnostics import capture_line_input, finish_line_diagnostics
+from eegproc.quality_figures import line_noise_figure, waveform_figures, style
 from test_pipeline import fixture
 
 

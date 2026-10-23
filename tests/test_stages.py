@@ -5,11 +5,11 @@ from pathlib import Path
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline.settings import config_for
-from eeg_pipeline.configuration import resolve_config
-from eeg_pipeline.ica import choose_components,validate_exclude
-from eeg_pipeline.api import run,resume
-from eeg_pipeline.review import resume_ica
+from eegproc.settings import config_for
+from eegproc.configuration import resolve_config
+from eegproc.ica import choose_components,validate_exclude
+from eegproc.api import run,resume
+from eegproc.review import resume_ica
 from test_pipeline import fixture
 
 
@@ -66,7 +66,7 @@ def test_review_resume_uses_same_model_preserves_metadata_and_manual_override(re
     assert not (tmp_path/'review/review_stages').exists()
     checkpoint=Path(result.outputs['checkpoint'])
     original_hash=checkpoint.read_bytes()
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     def no_refit(*a,**kw):raise AssertionError('Resume must never refit ICA')
     monkeypatch.setattr(engine,'fit_ica',no_refit)
     resumed=resume(checkpoint,tmp_path/'resumed','resumed',exclude=[],reviewer='test',reason='keep all',original_raw=raw)
@@ -110,9 +110,9 @@ def test_all_disabled_honors_input_bads_and_stage_defaults(tmp_path):
 
 def test_eeglab_fir_port_and_bad_boundary_protection():
     pytest.importorskip('eegprep')
-    from eeg_pipeline.backends import apply_filter
+    from eegproc.backends import apply_filter
     from eegprep import pop_eegfiltnew
-    from eeg_pipeline.backends import eegprep_input
+    from eegproc.backends import eegprep_input
     raw=fixture().pick('eeg');before=raw.get_data().copy()
     c=config_for(preset='eeglab',filter_order=2000)
     apply_filter(raw,.5,100,c)

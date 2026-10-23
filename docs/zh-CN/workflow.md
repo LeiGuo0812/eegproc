@@ -15,7 +15,9 @@
 ## 主处理流程
 
 ```mermaid
-flowchart TD
+flowchart TB
+    accTitle: EEG processing stages
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     DEV["设备文件"] --> PREP["独立数据准备<br/>读取校准、通道类型、电极位置和事件"]
     PREP --> RAW["连续 MNE Raw<br/>SI 单位、原生时间信息、注释和辅助通道"]
     RAW --> RES["解析参数及可选事件请求<br/>检查输入、电极坐标和输出冲突"]
@@ -64,7 +66,9 @@ flowchart TD
 ## ICA 人工复核与续处理
 
 ```mermaid
-flowchart TD
+flowchart TB
+    accTitle: ICA review and continuation
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     FIT["ICA 已拟合，尚未减除成分"] --> CHECKPOINT["不可变断点<br/>pre_ica_raw.fif + decomposition-ica.fif + checkpoint.json"]
     CHECKPOINT --> MODE{"初次模式"}
     MODE -->|review| REVIEW["复核 HTML<br/>等待选择；result.raw 为 None"]
@@ -87,7 +91,9 @@ flowchart TD
 ## 输入与交付文件
 
 ```mermaid
-flowchart LR
+flowchart TB
+    accTitle: Input and output files
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     IN["准备后的输入<br/>内存 Raw 或 prepared *_raw.fif"] --> RUN["run"]
     IN -.->|保留以便校验续处理| RESUME["resume"]
     RUN --> CP["*_ica_review/<br/>pre_ica_raw.fif<br/>decomposition-ica.fif<br/>checkpoint.json"]

@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 from mne.utils import object_diff
 from threadpoolctl import threadpool_limits
-from mne_asr import ASR, ASRConfig, clean_asr_raw
+from eegproc.mne_asr import ASR, ASRConfig, clean_asr_raw
 from test_pipeline import fixture
 
 
@@ -102,7 +102,7 @@ def test_invalid_parameters_fail_before_processing(config):
 
 
 def test_numerical_failure_never_returns_changed_data(monkeypatch):
-    import mne_asr.api as api
+    import eegproc.mne_asr.api as api
     raw=fixture();raw.set_annotations(mne.Annotations([],[],[]));before=raw.get_data().copy()
     model=ASR().fit(raw)
     def explode(x,*args,**kwargs):return x*1000,{'diagnostics':{}}
@@ -131,7 +131,7 @@ class Block(importlib.abc.MetaPathFinder):
   if name.split('.')[0] in ('eegprep','asrpy'):raise ImportError('Forbidden dependency: '+name)
 sys.meta_path.insert(0,Block())
 import numpy as np,mne
-from mne_asr import clean_asr_raw
+from eegproc.mne_asr import clean_asr_raw
 x=np.random.default_rng(21).normal(size=(4,8192))*1e-6
 raw=mne.io.RawArray(x,mne.create_info(['A','B','C','D'],256,'eeg'),verbose=False)
 out,report=clean_asr_raw(raw)
@@ -145,17 +145,18 @@ print('independent ASR passed')
 
 
 def test_native_backend_pipeline_epochs_and_optional_package_metadata(tmp_path,monkeypatch):
-    import eeg_pipeline.pipeline as pipeline
+    import eegproc.engine as pipeline
+    from eegproc.settings import config_for
     from importlib.metadata import PackageNotFoundError
-    from erp_outputs import make_strict_epochs
+    from eegproc.epoch_export import make_strict_epochs
     original_version=pipeline.version
     def version(name):
         if name=='eegprep':raise PackageNotFoundError(name)
         return original_version(name)
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     monkeypatch.setattr(engine,'version',version)
     raw=fixture();events=np.array([[raw.first_samp+4*256,0,1],[raw.first_samp+10*256,0,1],[raw.first_samp+20*256,0,1]])
-    out,report,_=pipeline.preprocess_raw(raw,tmp_path,'standard',config=pipeline.config_for(asr_backend='mne_native',detect_ransac=False))
+    out,report,_=pipeline.preprocess_raw(raw,tmp_path,'standard',config=config_for(asr_backend='mne_native',detect_ransac=False))
     ep,qc=make_strict_epochs(out,raw,events,{'target':1},global_bads=report['bad_channels'])
     assert events[1,0] not in ep.events[:,0]
     assert any('BAD_manual' in r['drop_reasons'] for r in qc['records'])

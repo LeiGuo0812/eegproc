@@ -1,4 +1,4 @@
-"""The public rename shares implementation and preserves checkpoint boundaries."""
+"""Public package entry points and computation-checkpoint boundaries."""
 import copy
 import hashlib
 import importlib
@@ -20,32 +20,19 @@ def test_distribution_import_and_console_names_are_eegproc():
     metadata = tomllib.loads((ROOT / 'pyproject.toml').read_text(encoding='utf-8'))
     assert metadata['project']['name'] == 'eegproc'
     assert metadata['project']['scripts']['eegproc'] == 'eegproc.cli:main'
-    assert metadata['project']['scripts']['eegproc-prepare'] == 'prepare_data:main'
+    assert metadata['project']['scripts']['eegproc-prepare'] == 'eegproc.prepare_cli:main'
     assert metadata['project']['urls']['Repository'] == 'https://github.com/LeiGuo0812/eegproc'
-    assert eegproc.__version__ == '0.4.0a1'
+    assert eegproc.__version__ == '0.4.0a2'
 
 
-def test_legacy_api_and_submodules_are_the_same_objects():
-    legacy = importlib.import_module('eeg_pipeline')
-    for name in eegproc.__all__:
-        assert getattr(legacy, name) is getattr(eegproc, name), name
-    for path in (ROOT / 'eegproc').rglob('*.py'):
-        relative = path.relative_to(ROOT / 'eegproc')
-        if relative.name == '__main__.py' or str(relative) == '__init__.py':
-            continue
-        parts = list(relative.with_suffix('').parts)
-        if parts[-1] == '__init__':
-            parts.pop()
-        suffix = '.'.join(parts)
-        assert importlib.import_module('eeg_pipeline.' + suffix) is importlib.import_module('eegproc.' + suffix), suffix
 
-
-@pytest.mark.parametrize('package', ['eegproc', 'eeg_pipeline'])
-def test_new_and_legacy_module_commands_work(package):
+@pytest.mark.parametrize('package', ['eegproc', 'eegproc.prepare_cli'])
+def test_public_module_command_works(package):
     result = subprocess.run([sys.executable, '-B', '-m', package, '--help'],
                             cwd=ROOT, capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
-    assert '--input-fif' in result.stdout and '--resume' in result.stdout
+    assert ('--input-fif' in result.stdout and '--resume' in result.stdout
+            if package == 'eegproc' else '--output-fif' in result.stdout)
 
 
 def test_manifest_hashes_real_code_under_stable_canonical_keys():

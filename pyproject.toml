@@ -45,9 +45,7 @@ dev = [
 
 [project.scripts]
 eegproc = "eegproc.cli:main"
-eegproc-prepare = "prepare_data:main"
-eeg-preprocess = "eegproc.cli:main"
-eeg-prepare = "prepare_data:main"
+eegproc-prepare = "eegproc.prepare_cli:main"
 
 [project.urls]
 Repository = "https://github.com/LeiGuo0812/eegproc"
@@ -56,19 +54,17 @@ Issues = "https://github.com/LeiGuo0812/eegproc/issues"
 
 [tool.setuptools]
 include-package-data = true
-py-modules = ["erp_outputs", "mne_bridge", "neuracle_io", "prepare_data", "preprocess", "project_layout"]
 # ASR's own LICENSE is shipped as package data below. Listing another file
 # named LICENSE here would collide with the project license on setuptools 70.
-license-files = ["LICENSE", "NOTICE", "eegproc/resources/LICENSE-MNE.txt", "eegproc/RELEASE_STATUS.md", "docs/THIRD_PARTY_NOTICES.md"]
+license-files = ["LICENSE", "NOTICE", "eegproc/resources/LICENSE-MNE.txt", "docs/THIRD_PARTY_NOTICES.md"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["eegproc*", "eeg_pipeline*", "mne_asr"]
+include = ["eegproc*"]
 exclude = ["tests*", "results*", "docs*", "scripts*", "python*"]
 namespaces = false
 
 [tool.setuptools.package-data]
-eegproc = ["RELEASE_STATUS.md"]
 "eegproc.resources" = ["*.elc", "LICENSE-MNE.txt", "PROVENANCE.json"]
 "eegproc.mne_asr" = ["LICENSE", "PROVENANCE.json", "README.md"]
 

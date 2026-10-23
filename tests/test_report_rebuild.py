@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from eeg_pipeline import PipelineResult, render_report, resolve_config
-from eeg_pipeline.reporting import _read_html
+from eegproc import PipelineResult, render_report, resolve_config
+from eegproc.reporting import _read_html
 
 
 PNG='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j2ioAAAAASUVORK5CYII='
@@ -51,10 +51,10 @@ def legacy_report(tmp_path):
 @pytest.fixture
 def prohibit_processing(monkeypatch):
     import mne
-    import eeg_pipeline.engine as engine
-    import eeg_pipeline.review as review
-    import eeg_pipeline.ica as ica
-    import eeg_pipeline.quality_figures as figures
+    import eegproc.engine as engine
+    import eegproc.review as review
+    import eegproc.ica as ica
+    import eegproc.quality_figures as figures
     def forbidden(*args,**kwargs):raise AssertionError('Report-only rendering must reuse recorded plots')
     for module,name in [(engine,'preprocess_raw'),(review,'resume_ica'),(ica,'fit_ica'),(ica,'apply_ica'),
             (figures,'build_signal_figures'),(figures,'retention_figure'),
@@ -63,7 +63,7 @@ def prohibit_processing(monkeypatch):
 
 
 def test_legacy_html_rebuild_reuses_images_diagnostics_and_current_layout(tmp_path,monkeypatch,prohibit_processing):
-    import eeg_pipeline.quality_report as reporting
+    import eegproc.quality_report as reporting
     source,old,details=legacy_report(tmp_path)
     originals={path:path.read_bytes() for path in tmp_path.iterdir()}
     monkeypatch.setattr(reporting,'CSS',reporting.CSS+'\n/* current-layout-marker */')
@@ -126,18 +126,3 @@ def test_existing_report_is_never_overwritten(tmp_path):
     source,_,_=legacy_report(tmp_path);original=source.read_bytes()
     with pytest.raises(FileExistsError):render_report(source,source)
     assert source.read_bytes()==original
-
-
-def test_existing_project_report_rebuild_without_processing(tmp_path,prohibit_processing):
-    source=Path(__file__).parents[1]/'results/eeg_pipeline/rest/rest_report.html'
-    if not source.is_file():pytest.skip('Historical project report is not distributed with the package')
-    before=source.read_bytes()
-    original=_read_html(source)
-    target=render_report(source,tmp_path/'rest_report.html')
-    rebuilt=_read_html(target)
-    for key in ('ica','ica_checkpoint','config','metadata_audit','provenance','epochs'):
-        assert rebuilt.get(key)==original.get(key)
-    assert [figure['sha256'] for figure in rebuilt['visualizations']['figures']]==[
-        figure['sha256'] for figure in original['visualizations']['figures']]
-    assert rebuilt['ica_diagnostics']==original['ica_diagnostics']
-    assert source.read_bytes()==before

@@ -7,11 +7,13 @@ from pathlib import Path
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline.configuration import resolve_config, resolve_events
-from eeg_pipeline.pipeline import config_for, _select_heart, _fit_ica, preprocess_raw
-from eeg_pipeline.raw_helpers import raw_slice, signal_hash
-from eeg_pipeline.preparation import prepare_data
-from eeg_pipeline.report_provenance import methods_text
+from eegproc.configuration import resolve_config, resolve_events
+from eegproc.settings import config_for
+from eegproc.ica import _select_heart, _fit_ica
+from eegproc.engine import preprocess_raw
+from eegproc.raw_helpers import raw_slice, signal_hash
+from eegproc.preparation import prepare_data
+from eegproc.report_provenance import methods_text
 from test_pipeline import fixture
 
 
@@ -102,8 +104,8 @@ def test_heart_candidate_is_really_subtracted_without_ecg(monkeypatch):
 @pytest.mark.parametrize('has_ecg',[False,True])
 def test_single_band_pipeline_fixed_epochs_metadata_and_small_report(has_ecg,tmp_path,monkeypatch):
     import pyprep
-    import eeg_pipeline.pipeline as pipeline
-    import eeg_pipeline.quality_figures as figures
+    import eegproc.signal_ops as pipeline
+    import eegproc.quality_figures as figures
     import mne_icalabel.iclabel as label
     raw=fixture(False)
     if has_ecg:

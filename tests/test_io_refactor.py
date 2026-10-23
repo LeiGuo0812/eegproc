@@ -6,7 +6,7 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline.storage import OutputPlan, OutputStore, _commit, atomic_save_raw, atomic_write_json
+from eegproc.storage import OutputPlan, OutputStore, _commit, atomic_save_raw, atomic_write_json
 
 
 def small_raw(n_times=1024, n_channels=8):
@@ -36,7 +36,7 @@ def test_output_family_collision_preserves_existing_artifact(tmp_path,name):
 
 
 def test_preflight_protects_input_path_and_does_not_process(tmp_path,monkeypatch):
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     raw=small_raw()
     source=tmp_path/'subject_cont_raw.fif'
     raw.save(source,fmt='double',verbose=False)
@@ -52,7 +52,7 @@ def test_preflight_protects_input_path_and_does_not_process(tmp_path,monkeypatch
 
 
 def test_existing_output_stops_run_without_new_report(tmp_path,monkeypatch):
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     existing=tmp_path/'subject_cont_raw.fif';existing.write_bytes(b'previous result')
     def forbidden(*args,**kwargs):
         raise AssertionError('Output collision must precede signal processing')
@@ -81,7 +81,7 @@ def test_staged_save_failure_preserves_input_and_removes_only_temporary_files(tm
 
 
 def test_commit_failure_rolls_back_new_family_without_touching_existing(tmp_path,monkeypatch):
-    import eeg_pipeline.storage as storage
+    import eegproc.storage as storage
     staging=tmp_path/'staging';staging.mkdir()
     files=[staging/'new_raw.fif',staging/'new_raw-1.fif']
     for file in files:file.write_bytes(b'new file')
@@ -99,7 +99,7 @@ def test_commit_failure_rolls_back_new_family_without_touching_existing(tmp_path
 
 
 def test_commit_detects_late_collision_without_deleting_new_external_file(tmp_path,monkeypatch):
-    import eeg_pipeline.storage as storage
+    import eegproc.storage as storage
     staging=tmp_path/'staging';staging.mkdir()
     files=[staging/'new_raw.fif',staging/'new_raw-1.fif']
     for file in files:file.write_bytes(b'new file')
@@ -123,7 +123,7 @@ def windows_lock_error(code):
 
 @pytest.mark.parametrize('code',[5,32,33])
 def test_commit_retries_transient_windows_locks_only_with_owned_target(tmp_path,monkeypatch,code):
-    import eeg_pipeline.storage as storage
+    import eegproc.storage as storage
     staging=tmp_path/'staging';staging.mkdir()
     source=staging/'new_raw.fif';source.write_bytes(b'complete new recording')
     output=tmp_path/'output';output.mkdir()
@@ -140,7 +140,7 @@ def test_commit_retries_transient_windows_locks_only_with_owned_target(tmp_path,
 
 
 def test_commit_permanent_windows_lock_is_bounded_and_rolls_back_own_family(tmp_path,monkeypatch):
-    import eeg_pipeline.storage as storage
+    import eegproc.storage as storage
     staging=tmp_path/'staging';staging.mkdir()
     files=[staging/'new_raw.fif',staging/'new_raw-1.fif']
     for path in files:path.write_bytes(b'new recording')
@@ -159,7 +159,7 @@ def test_commit_permanent_windows_lock_is_bounded_and_rolls_back_own_family(tmp_
 
 
 def test_commit_retry_does_not_replace_or_delete_external_change_to_reservation(tmp_path,monkeypatch):
-    import eeg_pipeline.storage as storage
+    import eegproc.storage as storage
     staging=tmp_path/'staging';staging.mkdir()
     source=staging/'new_raw.fif';source.write_bytes(b'new recording')
     output=tmp_path/'output';output.mkdir();attempts=[]
@@ -227,7 +227,7 @@ def test_atomic_epoch_split_roundtrip_and_inventory(tmp_path,monkeypatch):
 
 @pytest.mark.parametrize('status',['completed','review_required','awaiting_ica_review','failed'])
 def test_report_failure_preserves_scientific_status_error_and_delivered_data(tmp_path,monkeypatch,status):
-    import eeg_pipeline.quality_report as reporting
+    import eegproc.quality_report as reporting
     raw=tmp_path/'subject_cont_raw.fif';raw.write_bytes(b'already committed recording')
     original_error={'type':'RuntimeError','message':'original processing error'} if status=='failed' else None
     report={'status':status,'outputs':{'raw':str(raw)},'config':{}}
@@ -245,9 +245,9 @@ def test_report_failure_preserves_scientific_status_error_and_delivered_data(tmp
 
 
 def test_pipeline_processing_exception_survives_render_and_fallback_write_failures(tmp_path,monkeypatch):
-    import eeg_pipeline.engine as engine
-    import eeg_pipeline.quality_report as reporting
-    import eeg_pipeline.storage as storage
+    import eegproc.engine as engine
+    import eegproc.quality_report as reporting
+    import eegproc.storage as storage
     def processing_error(*args,**kwargs):raise ValueError('original numerical failure')
     def report_error(*args,**kwargs):raise RuntimeError('plotting failure')
     def disk_error(*args,**kwargs):raise OSError('report disk failure')

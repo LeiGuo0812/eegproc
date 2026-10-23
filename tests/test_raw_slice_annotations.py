@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from mne.utils import object_diff
 
-from eeg_pipeline.raw_helpers import raw_slice
+from eegproc.raw_helpers import raw_slice
 
 
 @pytest.mark.parametrize('dated', [False, True])

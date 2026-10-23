@@ -6,9 +6,9 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline import compatibility
-from eeg_pipeline.checkpoint_input import input_reference,load_original,input_identity,identity_matches
-from eeg_pipeline.report_provenance import capture_signal_audit,_auxiliary_equal
+from eegproc import compatibility
+from eegproc.checkpoint_input import input_reference,load_original,input_identity,identity_matches
+from eegproc.report_provenance import capture_signal_audit,_auxiliary_equal
 from test_pipeline import fixture
 
 

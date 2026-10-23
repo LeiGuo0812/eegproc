@@ -5,9 +5,9 @@ import json
 
 import pytest
 
-from eeg_pipeline import PipelineConfig, resolve_config, run
-from eeg_pipeline.configuration import resolve_epoch_config
-from eeg_pipeline.settings import config_for
+from eegproc import PipelineConfig, resolve_config, run
+from eegproc.configuration import resolve_epoch_config
+from eegproc.settings import config_for
 
 
 # Canonical hashes captured from the untouched 0.2.0 config_for implementation.
@@ -56,7 +56,7 @@ def test_mapping_file_and_keyword_precedence(tmp_path):
     ('asr_options',{'max_memory_mb':False}),('asr_options',{'not_an_option':2}),
 ])
 def test_bad_types_are_resolved_and_audited_before_processing(parameter,value):
-    from eeg_pipeline.configuration import validate_options
+    from eegproc.configuration import validate_options
     resolved=resolve_config(**{parameter:value})
     validate_options(resolved)
     assert any(row['field'].startswith(parameter) for row in resolved.adjustments)
@@ -76,7 +76,7 @@ def test_nested_options_are_detached_immutable_and_serializable():
 
 
 def test_public_run_accepts_keywords_mapping_and_optional_file(monkeypatch,tmp_path):
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     captured=[]
     sentinel=object()
     def fake(raw,save_path,subject,**kwargs):
@@ -102,7 +102,7 @@ def test_public_run_accepts_keywords_mapping_and_optional_file(monkeypatch,tmp_p
 
 
 def test_cli_routes_through_public_api(monkeypatch,tmp_path):
-    from eeg_pipeline import api, cli
+    from eegproc import api, cli
     captured={}
     sentinel=object()
     monkeypatch.setattr(cli.mne.io,'read_raw_fif',lambda *a,**k:sentinel)
@@ -113,12 +113,12 @@ def test_cli_routes_through_public_api(monkeypatch,tmp_path):
     cli.main(['--input-fif',str(tmp_path/'source_raw.fif'),'--save-path',str(tmp_path/'out'),
         '--subject','test','--purpose','erp','--task-name','oddball','--asr-cutoff','off'])
     assert captured['config']==PipelineConfig(purpose='erp',task_name='oddball',asr_cutoff=None)
-    assert captured['invocation']['entrypoint']=='preprocess.py'
+    assert captured['invocation']['entrypoint']=='eegproc'
     assert captured['invocation']['explicit_overrides']['asr_cutoff'] is None
 
 
 def test_epoch_stage_resolves_legacy_override_without_changing_continuous_qc():
-    from eeg_pipeline.epochs import EpochConfig
+    from eegproc.epochs import EpochConfig
     config=resolve_config(purpose='erp',epoch_mode='events')
     default=resolve_epoch_config(config)
     assert default==EpochConfig()

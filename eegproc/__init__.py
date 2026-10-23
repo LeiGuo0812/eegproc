@@ -1,5 +1,5 @@
 """EEG preprocessing with native MNE input, outputs and ICA review."""
-__version__ = "0.4.0a1"
+__version__ = "0.4.0a2"
 
 from .configuration import PipelineConfig, resolve_config
 from .api import PipelineResult, run, resume, render_report

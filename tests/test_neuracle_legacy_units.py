@@ -1,7 +1,7 @@
 """An unusual vendor header must never silently relax voltage-unit validation."""
 import numpy as np
 import pytest
-from neuracle_io import _microvolt_scale, read_neuracle_bdf
+from eegproc.io.neuracle import _microvolt_scale, read_neuracle_bdf
 
 
 def test_legacy_unit_is_explicit_and_narrow():
@@ -31,8 +31,8 @@ def test_legacy_bdf_keeps_gain_values_and_records_assumption(tmp_path):
     assert result['metadata']['calibration_info'][0]['source_unit']=='uV/mm'
     assert result['metadata']['legacy_uv_per_mm_interpreted_as_uV']
     assert result['events']==[dict(type='1',latency=128.)]
-    from neuracle_io import import_neuracle
-    from mne_bridge import eeg_to_raw
+    from eegproc.io.neuracle import import_neuracle
+    from eegproc.io.bridge import eeg_to_raw
     import mne
     raw = eeg_to_raw(import_neuracle(tmp_path, allow_legacy_uv_per_mm=True))
     np.testing.assert_array_equal(raw.get_data(), result['data'] * 1e-6)

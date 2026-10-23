@@ -5,10 +5,10 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline import PipelineConfig
-from eeg_pipeline.configuration import resolve_epoch_config
-from eeg_pipeline.engine import _resolve_epoch_request
-from eeg_pipeline.runtime_parameters import resolve_for_raw
+from eegproc import PipelineConfig
+from eegproc.configuration import resolve_epoch_config
+from eegproc.engine import _resolve_epoch_request
+from eegproc.runtime_parameters import resolve_for_raw
 
 
 def recording(seconds=8.):

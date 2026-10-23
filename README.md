@@ -60,7 +60,9 @@ erp = run(
 ## Workflow and outputs
 
 ```mermaid
-flowchart LR
+flowchart TB
+    accTitle: EEG preprocessing workflow
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     A[MNE Raw] --> B[Line noise and bad channels]
     B --> C[Reference, filters and ASR]
     C --> D[ICA fit and checkpoint]

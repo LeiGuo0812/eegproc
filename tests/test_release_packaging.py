@@ -38,8 +38,7 @@ def test_runtime_imports_have_declared_distributions():
                 imports.update(alias.name.split('.')[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and not node.level and node.module:
                 imports.add(node.module.split('.')[0])
-    internal = {'eegproc', 'mne_asr', 'mne_bridge', 'neuracle_io', 'erp_outputs',
-                'project_layout', 'prepare_data'}
+    internal = {'eegproc'}
     distributions = {'PIL': 'pillow', 'mne_icalabel': 'mne-icalabel',
                      'sklearn': 'scikit-learn', 'picard': 'python-picard'}
     declared = set(requirements())

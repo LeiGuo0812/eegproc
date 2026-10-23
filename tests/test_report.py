@@ -4,8 +4,8 @@ import re
 from pathlib import Path
 import numpy as np
 import pytest
-from eeg_pipeline.configuration import resolve_config
-from eeg_pipeline.api import run
+from eegproc.configuration import resolve_config
+from eegproc.api import run
 from test_pipeline import fixture
 from report_helpers import read_report
 

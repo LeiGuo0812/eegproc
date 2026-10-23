@@ -1,4 +1,4 @@
-"""Thin FIF-to-Raw adapter; device preparation lives in prepare_data.py."""
+"""Thin FIF-to-Raw adapter; device preparation lives in eegproc-prepare."""
 import argparse
 from dataclasses import asdict
 import json
@@ -32,7 +32,7 @@ def option(p, name, choices, **kwargs):
 
 
 def parser():
-    p=argparse.ArgumentParser(description='EEG preprocessing from prepared MNE Raw/FIF. Device input: prepare_data.py. Priority: preset < JSON < explicit flags. Invalid scientific settings are resolved by the shared configuration policy and recorded in the report.')
+    p=argparse.ArgumentParser(description='EEG preprocessing from prepared MNE Raw/FIF. Device input: eegproc-prepare. Priority: preset < JSON < explicit flags. Invalid scientific settings are resolved by the shared configuration policy and recorded in the report.')
     start=p.add_mutually_exclusive_group(required=True)
     start.add_argument('--input-fif');start.add_argument('--resume',help='ICA review checkpoint.json; resumes without refitting')
     p.add_argument('--save-path',required=True);p.add_argument('--subject',required=True)
@@ -137,7 +137,7 @@ def main(argv=None):
     prep=Path(a.input_fif).with_suffix('.preparation.json')
     if prep.is_file():sources.append(str(prep))
     result=run(raw,a.save_path,a.subject,config=config,events=events,event_id=event_id,
-        invocation=dict(entrypoint='preprocess.py',argv=[sys.executable,*sys.argv] if argv is None else list(argv),
+        invocation=dict(entrypoint='eegproc',argv=[sys.executable,*sys.argv] if argv is None else list(argv),
             cwd=str(Path.cwd()),input_paths=sources,config_path=str(Path(a.config).resolve()) if a.config else None,
             config_precedence='preset < JSON < explicit flags',explicit_overrides=overrides,effective_config=asdict(config)))
     report=result.report

@@ -5,7 +5,7 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline import api, cli
+from eegproc import api, cli
 
 
 @pytest.fixture
@@ -136,7 +136,7 @@ def test_unusable_explicit_event_json_is_audited_and_skips_epochs_without_annota
                for record in call['config'].adjustments)
     assert str(source) in call['invocation']['input_paths']
     # A valid annotation must not replace the explicitly requested failed file.
-    from eeg_pipeline.engine import _resolve_epoch_request
+    from eegproc.engine import _resolve_epoch_request
     raw=mne.io.RawArray(np.zeros((1,1024)),mne.create_info(['Cz'],256.,'eeg'),verbose=False)
     raw.set_annotations(mne.Annotations([1.], [0.], ['target']))
     config,events,event_id,epoch_config,resolution=_resolve_epoch_request(

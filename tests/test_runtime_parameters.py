@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 from mne.utils import object_diff
 
-from eeg_pipeline import PipelineConfig
-from eeg_pipeline.runtime_parameters import resolve_for_raw,resolve_manual_exclude,update_parameter_report
-from eeg_pipeline.settings import validate_config
-from eeg_pipeline.signal_ops import band_filter
+from eegproc import PipelineConfig
+from eegproc.runtime_parameters import resolve_for_raw,resolve_manual_exclude,update_parameter_report
+from eegproc.settings import validate_config
+from eegproc.signal_ops import band_filter
 
 
 def raw_at(sfreq,*,highpass=0.,lowpass=None):

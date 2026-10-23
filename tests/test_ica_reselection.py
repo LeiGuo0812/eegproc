@@ -7,8 +7,8 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline import resolve_config, run, resume
-from eeg_pipeline.report_provenance import file_hash
+from eegproc import resolve_config, run, resume
+from eegproc.report_provenance import file_hash
 from test_pipeline import fixture
 
 
@@ -20,7 +20,7 @@ def components(page):
 @pytest.mark.parametrize("purpose,mode", [("rest","auto"), ("erp","manual")])
 def test_completed_run_can_restore_and_reselect_without_refitting(purpose,mode,tmp_path,monkeypatch):
     import mne_icalabel.iclabel as labels
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     def eye_first(training,model,inplace=True):
         p=np.zeros((model.n_components_,7));p[:,0]=1.
         p[0]=[.01,.01,.94,.01,.01,.01,.01]

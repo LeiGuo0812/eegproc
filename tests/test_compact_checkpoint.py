@@ -5,8 +5,8 @@ import shutil
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline import resolve_config,run,resume
-from eeg_pipeline.cli import parser,main
+from eegproc import resolve_config,run,resume
+from eegproc.cli import parser,main
 from test_pipeline import fixture
 from report_helpers import read_report
 
@@ -56,7 +56,7 @@ def test_file_backed_compact_resume_and_relocated_input(tmp_path,monkeypatch,int
     assert pre.ch_names==raw.ch_names and pre.annotations==raw.annotations
     np.testing.assert_array_equal(pre.get_data(picks=['EOG','STI']),raw.get_data(picks=['EOG','STI']))
     def never(*args,**kwargs):raise AssertionError('Resume must use the saved decomposition and diagnostics')
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     monkeypatch.setattr(engine,'fit_ica',never)
     monkeypatch.setattr(mne.preprocessing.ICA,'get_sources',never)
     resumed=resume(checkpoint,tmp_path/'resumed','s',

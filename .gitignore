@@ -22,9 +22,6 @@ test data/
 *.bdf
 *.edf
 *.fif
-!tests/fixtures/staged_v3/input_raw.fif
-!tests/fixtures/staged_v3/p16_rest_cont_raw.fif
-!tests/fixtures/staged_v3/p16_erp_cont_raw.fif
 .env
 .env.*
 !.env.example

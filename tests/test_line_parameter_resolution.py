@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 from mne.annotations import _annotations_starts_stops
 
-from eeg_pipeline import PipelineConfig
-from eeg_pipeline.backends import clean_line
-from eeg_pipeline.runtime_parameters import resolve_for_raw,spectrum_fit_support
-from eeg_pipeline.signal_ops import BOUNDARIES
+from eegproc import PipelineConfig
+from eegproc.backends import clean_line
+from eegproc.runtime_parameters import resolve_for_raw,spectrum_fit_support
+from eegproc.signal_ops import BOUNDARIES
 
 
 def recording(seconds=8.):

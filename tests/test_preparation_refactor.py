@@ -6,8 +6,8 @@ import mne
 import numpy as np
 import pytest
 
-from eeg_pipeline.preparation import PreparationResult,prepare_data
-from eeg_pipeline.checkpoint_input import input_identity,identity_matches
+from eegproc.preparation import PreparationResult,prepare_data
+from eegproc.checkpoint_input import input_identity,identity_matches
 from test_pipeline import fixture
 
 
@@ -60,7 +60,7 @@ def test_preparation_preflights_every_output_and_split_family(tmp_path,collision
 
 
 def test_preparation_sidecar_failure_removes_only_new_outputs(tmp_path,monkeypatch):
-    import eeg_pipeline.preparation as preparation
+    import eegproc.preparation as preparation
     source=source_file(tmp_path);output=tmp_path/'prepared_raw.fif'
     unrelated=tmp_path/'keep.txt';unrelated.write_text('keep')
     write=preparation.atomic_write_json

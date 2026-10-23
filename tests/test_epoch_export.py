@@ -5,8 +5,8 @@ import sys
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline.epochs import EpochConfig
-from erp_outputs import make_strict_epochs
+from eegproc.epochs import EpochConfig
+from eegproc.epoch_export import make_strict_epochs
 
 
 def example(clock):
@@ -73,8 +73,8 @@ def test_grid_mismatch_rejected():
 
 
 def test_rest_cli_enables_epochs_without_changing_continuous_config(monkeypatch,tmp_path):
-    import eeg_pipeline.cli
-    import eeg_pipeline.engine as pipeline
+    import eegproc.cli
+    import eegproc.engine as pipeline
     raw,clean,events=example(False)
     raw.annotations.append(raw.first_time+2.,0.,'target')
     clean.annotations.append(clean.first_time+2.,0.,'target')
@@ -87,7 +87,7 @@ def test_rest_cli_enables_epochs_without_changing_continuous_config(monkeypatch,
     monkeypatch.setattr(pipeline,'preprocess_raw',fake)
     monkeypatch.setattr(sys,'argv',['balanced','--input-fif',str(inp),'--save-path',str(tmp_path),
         '--subject','p13','--config','configs/rest.json','--epochs','--event-names','target'])
-    eeg_pipeline.cli.main()
+    eegproc.cli.main()
     cfg=calls[0]['config']
     assert cfg.purpose=='rest' and cfg.asr_cutoff==20 and cfg.highpass==.5
     assert cfg.epoch_mode=='events' and cfg.event_names==('target',)
@@ -96,8 +96,8 @@ def test_rest_cli_enables_epochs_without_changing_continuous_config(monkeypatch,
 
 @pytest.mark.parametrize('source',['stim','annotations'])
 def test_explicit_event_source_does_not_read_automatic_sidecar(source,monkeypatch,tmp_path):
-    import eeg_pipeline.cli
-    import eeg_pipeline.engine as pipeline
+    import eegproc.cli
+    import eegproc.engine as pipeline
     raw,clean,events=example(False)
     inp=tmp_path/'input_raw.fif';raw.save(inp,fmt='double',overwrite=True,verbose=False)
     inp.with_suffix('.events.json').write_text(json.dumps({'events':events.tolist(),'event_id':{'sidecar':1}}))
@@ -106,7 +106,7 @@ def test_explicit_event_source_does_not_read_automatic_sidecar(source,monkeypatc
         calls.append(kw)
         return clean,dict(quality_flags=[],status='completed',outputs={}),None
     monkeypatch.setattr(pipeline,'preprocess_raw',fake)
-    eeg_pipeline.cli.main(['--input-fif',str(inp),'--save-path',str(tmp_path),'--subject','events',
+    eegproc.cli.main(['--input-fif',str(inp),'--save-path',str(tmp_path),'--subject','events',
                       '--epochs','--event-source',source])
     assert calls[0]['events'] is None
     assert calls[0]['config'].event_source==source

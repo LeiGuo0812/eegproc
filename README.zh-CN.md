@@ -60,7 +60,9 @@ erp = run(
 ## 流程与输出
 
 ```mermaid
-flowchart LR
+flowchart TB
+    accTitle: EEG preprocessing workflow
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     A[MNE Raw] --> B[工频处理与坏导检测]
     B --> C[参考、滤波和 ASR]
     C --> D[ICA 拟合及断点]

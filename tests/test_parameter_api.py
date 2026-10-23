@@ -5,13 +5,13 @@ import json
 
 import pytest
 
-from eeg_pipeline import PipelineConfig, run
-from eeg_pipeline.configuration import resolve_epoch_config
+from eegproc import PipelineConfig, run
+from eegproc.configuration import resolve_epoch_config
 
 
 @pytest.fixture
 def captured_engine(monkeypatch):
-    import eeg_pipeline.engine as engine
+    import eegproc.engine as engine
     captured = []
     raw = object()
 

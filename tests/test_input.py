@@ -1,7 +1,7 @@
 """Input conversion must preserve voltage, event timing and head geometry."""
 import mne
 import numpy as np
-from mne_bridge import eeg_to_raw, export_mne_fif
+from eegproc.io.bridge import eeg_to_raw, export_mne_fif
 
 
 def test_mne_input_units_geometry_and_saved_events(tmp_path):

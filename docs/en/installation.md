@@ -4,7 +4,7 @@
 
 ## 1. Choose Python and an environment
 
-Use **64-bit Python 3.12** for the full workflow. The standard package declares Python >=3.11; optional EEGPrep 0.4.0 requires >=3.12. Python/OS declarations describe install requirements, while observed test coverage is recorded separately in the [release audit](../RELEASE_AUDIT.md).
+Use **64-bit Python 3.12** for the full workflow. The standard package declares Python >=3.11; optional EEGPrep 0.4.0 requires >=3.12. Python/OS declarations describe install requirements, while observed test coverage is recorded separately in the [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml).
 
 Windows PowerShell, using the Python launcher:
 
@@ -79,7 +79,7 @@ The default ASR implementation is shipped inside eegproc; it does not require EE
 If a wheel is attached to a release, download the matching version and install the actual filename:
 
 ```bash
-python -m pip install eegproc-0.4.0a1-py3-none-any.whl
+python -m pip install eegproc-0.4.0a2-py3-none-any.whl
 ```
 
 pip still resolves dependencies from the package index. Copying only a wheel to an offline computer is insufficient unless all required dependency wheels are also available.
@@ -119,16 +119,16 @@ python -m build --outdir dist
 python -m twine check dist/*
 ```
 
-Build isolation may download build dependencies. The source release excludes real recordings, historical generated results and caches; small synthetic regression fixtures remain. Study data should stay outside the repository or in ignored directories.
+Build isolation may download build dependencies. The source release excludes real recordings, historical generated results and caches; tests generate synthetic data when needed. Study data should stay outside the repository or in ignored directories.
 
 The optional clean-install validator creates its own isolated environment and installs dependencies when run by a user or CI:
 
 ```bash
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a1-py3-none-any.whl --output validation/clean-default
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a1-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --output validation/clean-default
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
 ```
 
-Choose a new output directory. `--existing-environment-check` tests the available environment without installation and explicitly does not establish clean-install support. Refer to the [release audit](../RELEASE_AUDIT.md) and actual GitHub Actions run results for completed checks.
+Choose a new output directory. `--existing-environment-check` tests the available environment without installation and explicitly does not establish clean-install support. Refer to the [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml) and actual GitHub Actions run results for completed checks.
 
 ## Troubleshooting
 

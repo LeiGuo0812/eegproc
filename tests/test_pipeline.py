@@ -4,13 +4,15 @@ import json
 import mne
 import numpy as np
 import pytest
-from eeg_pipeline.pipeline import config_for,choose_components,preprocess_raw
-from eeg_pipeline.epochs import EpochConfig,repair_epochs,screen
+from eegproc.settings import config_for
+from eegproc.ica import choose_components
+from eegproc.engine import preprocess_raw
+from eegproc.epochs import EpochConfig,repair_epochs,screen
 
 
 def test_public_cli_defaults_enable_asr_for_both_purposes():
-    from eeg_pipeline.cli import parser
-    from eeg_pipeline import resolve_config
+    from eegproc.cli import parser
+    from eegproc import resolve_config
     for purpose in ('rest','erp'):
         args=parser().parse_args(['--input-fif','source_raw.fif','--save-path','out','--subject','demo','--purpose',purpose,'--line-frequency','60'])
         c=resolve_config(purpose=args.purpose,line_frequency=args.line_frequency)
@@ -19,7 +21,7 @@ def test_public_cli_defaults_enable_asr_for_both_purposes():
 
 
 def test_strict_output_never_changes_retained_trials(tmp_path):
-    from erp_outputs import make_strict_epochs
+    from eegproc.epoch_export import make_strict_epochs
     raw=fixture();clean=raw.copy()
     clean._data[2,1536:1600]+=1e-3*np.sin(np.linspace(0,8*np.pi,64))
     events=np.column_stack([raw.first_samp+np.arange(3,37,3)*256,np.zeros(12,int),np.ones(12,int)])

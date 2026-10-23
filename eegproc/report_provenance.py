@@ -46,10 +46,10 @@ class StageRecorder:
 
 def capture_provenance(raw,subject,invocation=None,montage=None):
     root=Path(__file__).resolve().parents[1]
-    files=list((root/'eegproc').rglob('*.py'))+list((root/'python/common/mne_asr').glob('*.py'))
+    files=list((root/'eegproc').rglob('*.py'))
     files += [p for p in (root/'eegproc').rglob('*')
               if p.is_file() and (p.name in ('LICENSE','PROVENANCE.json') or p.suffix=='.elc')]
-    files += [root/p for p in ['project_layout.py','erp_outputs.py','preprocess.py','prepare_data.py','python/common/mne_bridge.py','python/common/neuracle_io.py','python/common/mne_asr/PROVENANCE.json','python/common/mne_asr/LICENSE','requirements.txt'] if (root/p).exists()]
+    files += [root/'requirements.txt'] if (root/'requirements.txt').exists() else []
     code={p.relative_to(root).as_posix():file_hash(p) for p in sorted(set(files))}
     bundle=hashlib.sha256(json.dumps(code,sort_keys=True).encode()).hexdigest()
     sources=[]
@@ -62,7 +62,7 @@ def capture_provenance(raw,subject,invocation=None,montage=None):
         try:versions[name]=importlib.metadata.version(name)
         except importlib.metadata.PackageNotFoundError:versions[name]='not installed'
     invocation=dict(invocation or {'entrypoint':'eegproc.run','argv':None})
-    invocation['entrypoint']={'Python API':'eegproc.run','preprocess.py':'eegproc.cli',
+    invocation['entrypoint']={'Python API':'eegproc.run','eegproc':'eegproc.cli',
         'resume_ica':'eegproc.resume'}.get(invocation.get('entrypoint'),invocation.get('entrypoint'))
     invocation.setdefault('argv',None)
     if invocation.get('config_path') and Path(invocation['config_path']).is_file():

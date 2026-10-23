@@ -15,7 +15,9 @@ These diagrams follow `engine.py`, `stages.py`, `signal_ops.py`, `review.py` and
 ## Main processing sequence
 
 ```mermaid
-flowchart TD
+flowchart TB
+    accTitle: EEG processing stages
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     DEV["Device files"] --> PREP["Separate preparation<br/>Read calibration, channel types, montage and events"]
     PREP --> RAW["Continuous MNE Raw<br/>SI units, native timing, annotations and auxiliary channels"]
     RAW --> RES["Resolve parameters and optional event request<br/>Check input, coordinates and output collisions"]
@@ -64,7 +66,9 @@ The default QC policy reports quality concerns and finishes viable processing fo
 ## ICA review and continuation
 
 ```mermaid
-flowchart TD
+flowchart TB
+    accTitle: ICA review and continuation
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     FIT["ICA fitted; nothing subtracted yet"] --> CHECKPOINT["Immutable checkpoint<br/>pre_ica_raw.fif + decomposition-ica.fif + checkpoint.json"]
     CHECKPOINT --> MODE{"Initial mode"}
     MODE -->|review| REVIEW["Review HTML<br/>Pending result; result.raw is None"]
@@ -87,7 +91,9 @@ Continuation reuses filtering, ASR, the ICA fit and ICLabel results. It reuses t
 ## Input and delivered files
 
 ```mermaid
-flowchart LR
+flowchart TB
+    accTitle: Input and output files
+    accDescr: Top-down sequence of processing, review decisions, or delivered files.
     IN["Prepared input<br/>Raw in memory or prepared *_raw.fif"] --> RUN["run"]
     IN -.->|Retain for verified continuation| RESUME["resume"]
     RUN --> CP["*_ica_review/<br/>pre_ica_raw.fif<br/>decomposition-ica.fif<br/>checkpoint.json"]
