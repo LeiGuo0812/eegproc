@@ -105,20 +105,56 @@ worker 函数应定义在模块顶层，并保留 `__main__` 保护；请作为 
 
 ## 流程与输出
 
+### 1. 信号准备
+
 ```mermaid
 flowchart TB
-    accTitle: EEG preprocessing workflow
-    accDescr: Top-down sequence of processing, review decisions, or delivered files.
-    A[MNE Raw] --> B[工频处理与坏导检测]
-    B --> C[参考、滤波和 ASR]
-    C --> D[ICA 拟合及断点]
-    D --> E[自动或人工选择 IC]
-    E --> F[重建与连续质控]
-    F --> G[可选分段质控]
-    G --> H[清理后 FIF、ICA 和 HTML]
-    D --> I[HTML 人工复核]
-    I -->|不重新拟合即可续处理| E
+    accTitle: EEG signal preparation steps
+    accDescr: Each node shows one preparation step, from MNE Raw input to ASR cleaning.
+    raw_input["输入 MNE Raw"] --> line_noise["去除工频噪声"]
+    line_noise --> bad_channels["检测坏导"]
+    bad_channels --> initial_reference["初次重参考"]
+    initial_reference --> common_filter["共同频段滤波"]
+    common_filter --> gross_artifacts["标记严重伪迹"]
+    gross_artifacts --> asr["ASR 去噪"]
 ```
+
+### 2. ICA 分解
+
+```mermaid
+flowchart TB
+    accTitle: ICA decomposition and selection
+    accDescr: Prepare the analysis and training bands, fit and classify ICA, then save a checkpoint before subtracting selected components.
+    reference_again["再次重参考"] --> training_band["ICA 训练频段滤波"]
+    reference_again --> analysis_band["分析频段滤波"]
+    training_band --> rank["估计数据秩"]
+    rank --> ica_fit["拟合 ICA"]
+    ica_fit --> iclabel["ICLabel 成分分类"]
+    iclabel --> checkpoint["保存 ICA 断点"]
+    analysis_band --> checkpoint
+    checkpoint --> selection["选择待剔除 IC"]
+    selection --> subtraction["减除选定 IC"]
+```
+
+### 3. 重建与输出
+
+```mermaid
+flowchart TB
+    accTitle: EEG reconstruction and delivery
+    accDescr: Reconstruct EEG, finish continuous quality control, and save the requested data and report as separate steps.
+    reconstruction["重建 EEG 通道"] --> interpolation["插值坏导"]
+    interpolation --> final_reference["最终重参考"]
+    final_reference --> residual_qc["标记残留伪迹"]
+    residual_qc --> continuous_fif["保存连续 FIF"]
+    continuous_fif --> ica_model["保存已拟合 ICA 模型"]
+    ica_model --> epoch_request{"是否输出分段？"}
+    epoch_request -->|是| epoch_qc["分段质控"]
+    epoch_qc --> epochs_fif["保存保留的分段"]
+    epochs_fif --> html_report["生成 HTML 报告"]
+    epoch_request -->|否| html_report
+```
+
+ICA 和插值步骤按所选参数执行。[详细流程图](docs/zh-CN/workflow.md)列出可选分支、ECG 辅助及 ICA 人工复核续处理。
 
 上方快速开始示例的输出：
 

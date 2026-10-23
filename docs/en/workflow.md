@@ -14,43 +14,198 @@ These diagrams follow `engine.py`, `stages.py`, `signal_ops.py`, `review.py` and
 
 ## Main processing sequence
 
+### 1. Input preparation and validation
+
 ```mermaid
 flowchart TB
-    accTitle: EEG processing stages
-    accDescr: Top-down sequence of processing, review decisions, or delivered files.
-    DEV["Device files"] --> PREP["Separate preparation<br/>Read calibration, channel types, montage and events"]
-    PREP --> RAW["Continuous MNE Raw<br/>SI units, native timing, annotations and auxiliary channels"]
-    RAW --> RES["Resolve parameters and optional event request<br/>Check input, coordinates and output collisions"]
-    RES --> EEG["Working copy: select EEG<br/>Keep original input and auxiliary samples intact"]
-    EEG --> LINE["Line-noise cleaning<br/>Capture paired spectra immediately before and after"]
-    LINE --> CH["Detect bad channels on a temporary training-band signal<br/>Default: exclude from working EEG; interpolate at the end"]
-    CH --> COMMON["Reference and common-band filter<br/>Common low = min of both high-pass edges<br/>Common high = max of both low-pass edges"]
-    COMMON --> GROSS["Measure gross-artifact windows before ASR<br/>Default: exclude these windows from ICA training"]
-    GROSS --> ASR["ASR: enabled by default for rest and ERP, cutoff 20<br/>Process uninterrupted valid segments separately"]
-    ASR --> ENABLED{"ICA enabled?"}
-    ENABLED -->|Yes| BRANCH["Reference again; create analysis and training bands<br/>Filter only additional required edges"]
-    BRANCH --> ANA["Analysis signal<br/>Rest: 0.5–80 Hz<br/>ERP: 0.1–30 Hz"]
-    BRANCH --> TRAIN["ICA training signal: 1–100 Hz<br/>Exclude input BAD, boundaries and gross windows"]
-    TRAIN --> ICA["Rank estimate → Picard ICA → ICLabel<br/>Threshold rule: usable ECG supports Heart candidates"]
-    ANA --> CP["Save pre-subtraction checkpoint<br/>Analysis data + frozen ICA + continuation record"]
-    ICA --> CP
-    CP --> SELECT{"ICA mode"}
-    SELECT -->|auto| AUTO["Use automatic exclusion proposal"]
-    SELECT -->|manual| MANUAL["Use supplied complete exclusion list"]
-    SELECT -->|review| PAUSE["Write review HTML and return awaiting_ica_review<br/>Continue through the review workflow below"]
-    AUTO --> APPLY["Subtract selected ICs from analysis signal"]
-    MANUAL --> APPLY
-    ENABLED -->|No| NOICA["Apply any remaining analysis-band filter"]
-    APPLY --> FINAL["Reconstruct EEG channels<br/>Final interpolation and reference as configured"]
-    NOICA --> FINAL
-    FINAL --> QC["Continuous residual QC<br/>Add BAD_residual annotations; retain all samples"]
-    QC --> SAVE["Save continuous FIF and final ICA model when available"]
-    SAVE --> EPOCH{"Epochs requested and events/windows available?"}
-    EPOCH -->|No| HTML["Write standalone HTML<br/>Effective settings, plots, QC, methods and provenance"]
-    EPOCH -->|Yes| EQC["Epoch QC; preserve input manual BAD<br/>Events + auto: actual event-window screen<br/>Fixed + auto: continuous annotation rejection"]
-    EQC --> EP["Save epoch FIF only if trials remain<br/>Report per-condition retention and rejection reasons"]
-    EP --> HTML
+    accTitle: Input preparation and validation
+    accDescr: Prepare continuous MNE input, resolve settings and verify the working EEG before cleaning.
+    device_files["Device files"]
+    prepare_input["Prepare MNE input"]
+    raw_input["Continuous MNE Raw"]
+    validate_input["Check Raw input"]
+    resolve_parameters["Resolve parameters"]
+    resolve_epochs["Resolve epoch request"]
+    check_output["Check output paths"]
+    copy_input["Create working copy"]
+    check_coordinates["Check EEG coordinates"]
+    select_eeg["Select working EEG"]
+    device_files --> prepare_input
+    prepare_input --> raw_input
+    raw_input --> validate_input
+    validate_input --> resolve_parameters
+    resolve_parameters --> resolve_epochs
+    resolve_epochs --> check_output
+    check_output --> copy_input
+    copy_input --> check_coordinates
+    check_coordinates --> select_eeg
 ```
+
+Preparation is a separate script. The input carries calibrated SI units, channel types, montage, timing, annotations and events; auxiliary samples remain in the original MNE container.
+
+### 2. Line noise and channel cleaning
+
+```mermaid
+flowchart TB
+    accTitle: Line noise and channel cleaning
+    accDescr: Capture line-noise spectra, handle detected bad channels and filter the common processing band.
+    line_before["Capture input line spectrum"]
+    clean_line["Remove line noise"]
+    line_after["Capture output line spectrum"]
+    detect_bads["Detect bad channels"]
+    early_interpolation{"Interpolate before ASR?"}
+    interpolate_early["Interpolate bad channels"]
+    exclude_bads["Exclude bad channels"]
+    initial_reference["Apply reference"]
+    common_filter["Filter common band"]
+    gross_mask["Mark gross artifact windows"]
+    line_before --> clean_line
+    clean_line --> line_after
+    line_after --> detect_bads
+    detect_bads --> early_interpolation
+    early_interpolation -->|Yes| interpolate_early
+    early_interpolation -->|No, default| exclude_bads
+    interpolate_early --> initial_reference
+    exclude_bads --> initial_reference
+    initial_reference --> common_filter
+    common_filter --> gross_mask
+```
+
+Bad-channel detection uses a temporary training-band signal. The gross-artifact mask is measured before ASR and is used for ICA training exclusion.
+
+### 3. ASR and band preparation
+
+```mermaid
+flowchart TB
+    accTitle: ASR and band preparation
+    accDescr: Apply ASR independently to valid segments, then prepare the analysis signal and optional ICA training data.
+    asr_enabled{"ASR enabled?"}
+    split_segments["Split valid ASR segments"]
+    calibrate_asr["Calibrate each segment"]
+    reconstruct_asr["Reconstruct each segment"]
+    ica_enabled{"ICA enabled?"}
+    training_reference["Apply reference again"]
+    training_band["Complete training filter"]
+    analysis_band["Complete analysis filter"]
+    select_training["Select valid training samples"]
+    analysis_only["Complete analysis filter"]
+    asr_enabled -->|Yes| split_segments
+    split_segments --> calibrate_asr
+    calibrate_asr --> reconstruct_asr
+    reconstruct_asr --> ica_enabled
+    asr_enabled -->|No| ica_enabled
+    ica_enabled -->|Yes| training_reference
+    training_reference --> training_band
+    training_band --> analysis_band
+    analysis_band --> select_training
+    ica_enabled -->|No| analysis_only
+```
+
+With ICA enabled, continue to stage 4. With ICA disabled, continue directly to stage 6. Band preparation only applies additional required filter edges; identical analysis and training bands share the full-record buffer.
+
+### 4. ICA decomposition and automatic proposal
+
+```mermaid
+flowchart TB
+    accTitle: ICA decomposition and automatic proposal
+    accDescr: Estimate rank, fit ICA, classify components and save a checkpoint before any component subtraction.
+    estimate_rank["Estimate training rank"]
+    fit_ica["Fit ICA"]
+    classify_ics["Run ICLabel"]
+    propose_exclusions["Propose component exclusions"]
+    ecg_support{"ECG support applicable?"}
+    check_heart["Check Heart ECG correlation"]
+    save_checkpoint["Save ICA checkpoint"]
+    estimate_rank --> fit_ica
+    fit_ica --> classify_ics
+    classify_ics --> propose_exclusions
+    propose_exclusions --> ecg_support
+    ecg_support -->|Yes| check_heart
+    ecg_support -->|No| save_checkpoint
+    check_heart --> save_checkpoint
+```
+
+ECG support applies to Heart-only candidates under the `threshold` rule when usable ECG exists. Its reference is prepared from the matching valid training samples before ICA fitting. Without usable ECG, ICLabel alone determines the automatic proposal. The checkpoint contains untouched analysis-band data and a frozen decomposition.
+
+### 5. Component selection
+
+```mermaid
+flowchart TB
+    accTitle: ICA component selection modes
+    accDescr: Select automatic or manual exclusions, or return a review report without subtracting components.
+    ica_mode{"ICA mode"}
+    automatic_list["Use automatic list"]
+    manual_list["Use complete manual list"]
+    apply_ica["Subtract selected components"]
+    review_html["Write review HTML"]
+    await_review(["Await ICA review"])
+    ica_mode -->|auto| automatic_list
+    ica_mode -->|manual| manual_list
+    ica_mode -->|review| review_html
+    automatic_list --> apply_ica
+    manual_list --> apply_ica
+    review_html --> await_review
+```
+
+Automatic and manual modes continue to stage 6. Review mode returns `awaiting_ica_review` with `result.raw is None`; use the continuation workflow below.
+
+### 6. Continuous data delivery
+
+```mermaid
+flowchart TB
+    accTitle: Continuous data finalization and delivery
+    accDescr: Rebuild EEG, apply configured final operations, annotate residual artifacts and save continuous results.
+    rebuild_eeg["Reconstruct EEG channels"]
+    final_interpolation["Interpolate bad channels"]
+    final_reference["Apply final reference"]
+    restore_container["Restore MNE container"]
+    continuous_qc["Check continuous residuals"]
+    annotate_residual["Add BAD_residual annotations"]
+    save_continuous["Save continuous FIF"]
+    model_available{"ICA model available?"}
+    save_model["Save final ICA model"]
+    epoch_stage(["Continue to stage 7"])
+    rebuild_eeg --> final_interpolation
+    final_interpolation --> final_reference
+    final_reference --> restore_container
+    restore_container --> continuous_qc
+    continuous_qc --> annotate_residual
+    annotate_residual --> save_continuous
+    save_continuous --> model_available
+    model_available -->|Yes| save_model
+    model_available -->|No| epoch_stage
+    save_model --> epoch_stage
+```
+
+Interpolation, reference and residual annotation follow their respective switches. Reconstruction preserves original auxiliary channels and MNE metadata; continuous QC retains all samples.
+
+### 7. Optional epochs and report
+
+```mermaid
+flowchart TB
+    accTitle: Optional epoch export and report
+    accDescr: Run requested epoch QC, save trials only when retained, then write the standalone HTML report.
+    epochs_available{"Epochs requested and available?"}
+    repair_enabled{"Epoch repair enabled?"}
+    repair_epochs["Run bounded epoch repair"]
+    strict_epochs["Run strict epoch QC"]
+    retained_trials{"Any trials retained?"}
+    save_epochs["Save epoch FIF"]
+    summarize_retention["Summarize trial retention"]
+    write_html["Write standalone HTML"]
+    epochs_available -->|Yes| repair_enabled
+    epochs_available -->|No| write_html
+    repair_enabled -->|Yes| repair_epochs
+    repair_enabled -->|No, default| strict_epochs
+    repair_epochs --> retained_trials
+    strict_epochs --> retained_trials
+    retained_trials -->|Yes| save_epochs
+    retained_trials -->|No| summarize_retention
+    save_epochs --> summarize_retention
+    summarize_retention --> write_html
+```
+
+With `epoch_qc="auto"`, event epochs use actual event-window QC and fixed epochs use continuous annotation rejection. Bounded repair is an alternative epoch path. Both preserve input BAD; the report includes per-condition retention and rejection reasons.
 
 - The standard common band is **0.5–100 Hz for rest** and **0.1–100 Hz for ERP**. Line cleaning occurs before this filter and before ASR, not only on the final low-pass output.
 - If analysis and ICA training bands are identical, for example **1–100 Hz**, they share the full-record band buffer. Selecting valid training samples and numerical algorithm work can still require other arrays.
@@ -65,46 +220,100 @@ The default QC policy reports quality concerns and finishes viable processing fo
 
 ## ICA review and continuation
 
+### Review the selection
+
 ```mermaid
 flowchart TB
-    accTitle: ICA review and continuation
-    accDescr: Top-down sequence of processing, review decisions, or delivered files.
-    FIT["ICA fitted; nothing subtracted yet"] --> CHECKPOINT["Immutable checkpoint<br/>pre_ica_raw.fif + decomposition-ica.fif + checkpoint.json"]
-    CHECKPOINT --> MODE{"Initial mode"}
-    MODE -->|review| REVIEW["Review HTML<br/>Pending result; result.raw is None"]
-    MODE -->|auto or manual| RESULT["Apply initial list<br/>Save cleaned data and report"]
-    RESULT --> REVISE["Later change the IC decision"]
-    REVIEW --> UI["Inspect every IC map, inline PSD and detail view<br/>Toggle Exclude on tile or in details"]
-    REVISE --> UI
-    UI --> JSON["Download confirmed selection.json<br/>Complete zero-based exclusion list"]
-    CHECKPOINT --> VALIDATE["resume: verify checkpoint, model, source/dependency compatibility<br/>and original prepared input identity"]
-    JSON --> VALIDATE
-    LIST["Alternative: exclude=[...] directly<br/>exclude=[] retains every IC"] --> VALIDATE
-    ORIGINAL["Original prepared FIF or unchanged original Raw"] --> VALIDATE
-    VALIDATE --> LOAD["Load untouched pre-subtraction analysis data<br/>and the frozen ICA model"]
-    LOAD --> APPLY["Apply the new complete exclusion list<br/>Omitted previously removed ICs are restored"]
-    APPLY --> POST["Final interpolation/reference → continuous QC<br/>→ save data/model → optional epoch QC → new HTML"]
+    accTitle: Review ICA component selection
+    accDescr: Inspect component maps and spectra, confirm exclusions and provide the complete selection for continuation.
+    open_report["Open ICA report"]
+    inspect_maps["Inspect component maps"]
+    inspect_psd["Inspect component spectra"]
+    inspect_details["Inspect component details"]
+    toggle_exclude["Adjust Exclude checkboxes"]
+    confirm_selection["Confirm complete selection"]
+    download_selection["Download selection.json"]
+    direct_list["Supply exclude list"]
+    call_resume["Call resume"]
+    open_report --> inspect_maps
+    inspect_maps --> inspect_psd
+    inspect_psd --> inspect_details
+    inspect_details --> toggle_exclude
+    toggle_exclude --> confirm_selection
+    confirm_selection --> download_selection
+    download_selection --> call_resume
+    direct_list --> call_resume
 ```
 
-Continuation reuses filtering, ASR, the ICA fit and ICLabel results. It reuses the parent checkpoint rather than writing another full copy. Checkbox edits alone do not modify saved FIFs; the original report's labels and plots describe its saved result until a new run is created. Use a separate output directory for continuation.
+Use the review HTML either before initial subtraction or after an automatic/manual run. Exclude checkboxes are available on each component tile and inside its detail view. The downloaded JSON and `exclude=[...]` are alternative inputs; indices start at zero, and `exclude=[]` keeps every component.
+
+### Resume from the checkpoint
+
+```mermaid
+flowchart TB
+    accTitle: Resume verified ICA checkpoint
+    accDescr: Verify the selection and unchanged checkpoint, restore original data and apply the revised complete exclusion list.
+    verify_selection["Verify selection identity"]
+    verify_hashes["Verify checkpoint hashes"]
+    check_compatibility["Check code compatibility"]
+    load_model["Load frozen ICA model"]
+    validate_exclusions["Validate exclusion indices"]
+    verify_original["Verify original input identity"]
+    load_pre_ica["Load pre-subtraction data"]
+    restore_metadata["Restore original MNE container"]
+    apply_selection["Subtract selected components"]
+    continue_delivery(["Continue at stage 6"])
+    verify_selection --> verify_hashes
+    verify_hashes --> check_compatibility
+    check_compatibility --> load_model
+    load_model --> validate_exclusions
+    validate_exclusions --> verify_original
+    verify_original --> load_pre_ica
+    load_pre_ica --> restore_metadata
+    restore_metadata --> apply_selection
+    apply_selection --> continue_delivery
+```
+
+Provide the original prepared FIF or the unchanged original Raw. Compatibility checks include the computation source and dependencies. Resume requires a separate output directory. The new list replaces the previous decision, so previously removed components omitted from the list are restored.
+
+Continuation reuses filtering, ASR, the ICA fit and ICLabel results. It reuses the parent checkpoint rather than writing another full copy. Checkbox edits alone do not modify saved FIFs; the original report's labels and plots describe its saved result until a new run is created.
 
 ## Input and delivered files
 
+### Result files
+
 ```mermaid
 flowchart TB
-    accTitle: Input and output files
-    accDescr: Top-down sequence of processing, review decisions, or delivered files.
-    IN["Prepared input<br/>Raw in memory or prepared *_raw.fif"] --> RUN["run"]
-    IN -.->|Retain for verified continuation| RESUME["resume"]
-    RUN --> CP["*_ica_review/<br/>pre_ica_raw.fif<br/>decomposition-ica.fif<br/>checkpoint.json"]
-    CP --> RESUME
-    RUN --> CONT["*_cont_raw.fif<br/>Clean continuous EEG + original auxiliaries"]
-    RUN --> MODEL["*-ica.fif<br/>Model + final exclusion list"]
-    RUN --> REPORT["*_report.html<br/>All figures, tables, parameters and provenance"]
-    RUN -->|When requested and retained| EPO["*_clean-epo.fif"]
-    REPORT -.->|User downloads review choice| SEL["selection.json"]
-    SEL --> RESUME
-    RESUME --> NEW["New output directory<br/>Continuous FIF + ICA + HTML<br/>Optional epoch FIF"]
+    accTitle: Delivered result files
+    accDescr: Each result file has its own node; requested retained epochs are derived from the continuous result.
+    completed_run["run or resume"]
+    continuous_file["*_cont_raw.fif"]
+    ica_file["*-ica.fif"]
+    report_file["*_report.html"]
+    epoch_file["*_clean-epo.fif"]
+    completed_run --> continuous_file
+    completed_run -->|ICA enabled| ica_file
+    completed_run --> report_file
+    continuous_file -->|Requested and retained| epoch_file
 ```
+
+The continuous FIF contains cleaned EEG and original auxiliaries. The final ICA model includes the applied exclusion list. The HTML embeds all report figures, tables, effective settings and provenance.
+
+### ICA checkpoint files
+
+```mermaid
+flowchart TB
+    accTitle: ICA checkpoint file layout
+    accDescr: Show the three independently saved checkpoint artifacts; continuation reuses this directory.
+    checkpoint_directory["*_ica_review/"]
+    pre_ica_file["pre_ica_raw.fif"]
+    decomposition_file["decomposition-ica.fif"]
+    checkpoint_file["checkpoint.json"]
+    checkpoint_directory --> pre_ica_file
+    checkpoint_directory --> decomposition_file
+    checkpoint_directory --> checkpoint_file
+```
+
+`pre_ica_raw.fif` contains the analysis-band signal before IC subtraction. `decomposition-ica.fif` is the frozen model; `checkpoint.json` records continuation settings, identity checks and report data.
 
 The normal completed ICA run contains **six files**: three result files and the three-file checkpoint. Retained epochs add one file. Review-only mode creates HTML plus the checkpoint; ICA-disabled runs have neither model nor checkpoint. Large FIFs may have numbered parts. No `original_raw.fif`, `preview_raw.fif`, stage-by-stage snapshots, or report image/table attachments are generated. The optional `selection.json` is downloaded by the reviewer.

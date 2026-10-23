@@ -105,20 +105,56 @@ Start with two workers and `n_threads=1`, then increase workers only when memory
 
 ## Workflow and outputs
 
+### 1. Signal preparation
+
 ```mermaid
 flowchart TB
-    accTitle: EEG preprocessing workflow
-    accDescr: Top-down sequence of processing, review decisions, or delivered files.
-    A[MNE Raw] --> B[Line noise and bad channels]
-    B --> C[Reference, filters and ASR]
-    C --> D[ICA fit and checkpoint]
-    D --> E[Automatic or manual IC selection]
-    E --> F[Reconstruction and continuous QC]
-    F --> G[Optional epoch QC]
-    G --> H[Clean FIF, ICA and HTML]
-    D --> I[HTML review]
-    I -->|Resume without refitting| E
+    accTitle: EEG signal preparation steps
+    accDescr: Each node shows one preparation step, from MNE Raw input to ASR cleaning.
+    raw_input["MNE Raw input"] --> line_noise["Clean line noise"]
+    line_noise --> bad_channels["Detect bad channels"]
+    bad_channels --> initial_reference["Apply initial reference"]
+    initial_reference --> common_filter["Filter common band"]
+    common_filter --> gross_artifacts["Mark gross artifacts"]
+    gross_artifacts --> asr["Apply ASR"]
 ```
+
+### 2. ICA decomposition
+
+```mermaid
+flowchart TB
+    accTitle: ICA decomposition and selection
+    accDescr: Prepare the analysis and training bands, fit and classify ICA, then save a checkpoint before subtracting selected components.
+    reference_again["Apply reference again"] --> training_band["Filter ICA training band"]
+    reference_again --> analysis_band["Filter analysis band"]
+    training_band --> rank["Estimate rank"]
+    rank --> ica_fit["Fit ICA"]
+    ica_fit --> iclabel["Classify ICs with ICLabel"]
+    iclabel --> checkpoint["Save ICA checkpoint"]
+    analysis_band --> checkpoint
+    checkpoint --> selection["Select ICs to exclude"]
+    selection --> subtraction["Subtract selected ICs"]
+```
+
+### 3. Reconstruction and outputs
+
+```mermaid
+flowchart TB
+    accTitle: EEG reconstruction and delivery
+    accDescr: Reconstruct EEG, finish continuous quality control, and save the requested data and report as separate steps.
+    reconstruction["Reconstruct EEG channels"] --> interpolation["Interpolate bad channels"]
+    interpolation --> final_reference["Apply final reference"]
+    final_reference --> residual_qc["Mark residual artifacts"]
+    residual_qc --> continuous_fif["Save continuous FIF"]
+    continuous_fif --> ica_model["Save ICA model if fitted"]
+    ica_model --> epoch_request{"Export epochs?"}
+    epoch_request -->|Yes| epoch_qc["Run epoch QC"]
+    epoch_qc --> epochs_fif["Save retained epochs"]
+    epochs_fif --> html_report["Write HTML report"]
+    epoch_request -->|No| html_report
+```
+
+ICA and interpolation steps follow the selected settings. The [detailed workflow](docs/en/workflow.md) includes optional paths, ECG support and manual ICA continuation.
 
 Output from the quick-start example above:
 
