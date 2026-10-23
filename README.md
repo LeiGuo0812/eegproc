@@ -57,6 +57,52 @@ erp = run(
 | Epoch export | When requested | When requested |
 | Report waveform window | 4 s | 4 s |
 
+## Parallel processing
+
+Independent recordings can run concurrently in separate processes. `max_workers` selects the number of recordings processed at once; `n_threads` limits supported numerical-library thread pools within a recording and does not start batch workers. The included CSV batch example runs sequentially.
+
+Save this as `parallel_preprocess.py` and run `python parallel_preprocess.py` from a terminal:
+
+```python
+import os
+
+# Set these before importing NumPy, MNE or PyTorch.
+for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ[name] = "1"
+
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
+from pathlib import Path
+
+
+def process_one(job):
+    recording_id, input_fif = job
+    import mne
+    from eegproc import run
+
+    with mne.io.read_raw_fif(input_fif, preload=False, verbose=False) as raw:
+        result = run(
+            raw, Path("outputs_parallel") / recording_id, recording_id,
+            purpose="rest", task_name="eyes_closed", n_threads=1,
+        )
+        return (recording_id, result.status, result.report.get("report_status"),
+                result.outputs["quality_report"])
+
+
+if __name__ == "__main__":
+    jobs = [
+        ("sub01_rest", "prepared/sub01_raw.fif"),
+        ("sub02_rest", "prepared/sub02_raw.fif"),
+    ]
+    with ProcessPoolExecutor(max_workers=2, mp_context=get_context("spawn")) as pool:
+        for recording_id, status, report_status, html in pool.map(process_one, jobs):
+            print(f"{recording_id}: {status}; report={report_status}; {html}")
+```
+
+Keep the worker at module level and retain the `__main__` guard; run this example as a `.py` file rather than directly in a notebook cell ([Python process-pool requirements](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor)). Each `recording_id` must be unique and each recording needs its own **new output directory**, including separate tasks or sessions from the same participant. Pass paths to workers and return small summaries, rather than transferring Raw data or PipelineResult objects between processes.
+
+Start with two workers and `n_threads=1`, then increase workers only when memory permits: each process still loads the recording and processing buffers. The environment settings reduce nested numerical threading; `n_threads` is not a strict limit on every thread in the process. Use process isolation for concurrent pipeline runs because plotting and logging have process-wide state. For ERP, set `purpose="erp"`, the appropriate `task_name`, and supply each recording's events inside its worker, as in the task example above.
+
 ## Workflow and outputs
 
 ```mermaid
@@ -73,6 +119,8 @@ flowchart TB
     D --> I[HTML review]
     I -->|Resume without refitting| E
 ```
+
+Output from the quick-start example above:
 
 ```text
 outputs/sub01_rest/

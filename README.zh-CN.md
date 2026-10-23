@@ -57,6 +57,52 @@ erp = run(
 | 分段导出 | 按需请求 | 按需请求 |
 | 报告波形时间窗 | 4 秒 | 4 秒 |
 
+## 并行处理
+
+支持使用独立进程同时处理多份记录。`max_workers` 决定同时处理的记录数；`n_threads` 限制单份记录中受支持的数值库线程池，不会自动启动批处理任务。仓库中的 CSV 批处理示例仍按顺序运行。
+
+将以下代码单独保存为 `parallel_preprocess.py`，在终端执行 `python parallel_preprocess.py`：
+
+```python
+import os
+
+# 在导入 NumPy、MNE 或 PyTorch 前设置。
+for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
+    os.environ[name] = "1"
+
+from concurrent.futures import ProcessPoolExecutor
+from multiprocessing import get_context
+from pathlib import Path
+
+
+def process_one(job):
+    recording_id, input_fif = job
+    import mne
+    from eegproc import run
+
+    with mne.io.read_raw_fif(input_fif, preload=False, verbose=False) as raw:
+        result = run(
+            raw, Path("outputs_parallel") / recording_id, recording_id,
+            purpose="rest", task_name="eyes_closed", n_threads=1,
+        )
+        return (recording_id, result.status, result.report.get("report_status"),
+                result.outputs["quality_report"])
+
+
+if __name__ == "__main__":
+    jobs = [
+        ("sub01_rest", "prepared/sub01_raw.fif"),
+        ("sub02_rest", "prepared/sub02_raw.fif"),
+    ]
+    with ProcessPoolExecutor(max_workers=2, mp_context=get_context("spawn")) as pool:
+        for recording_id, status, report_status, html in pool.map(process_one, jobs):
+            print(f"{recording_id}: {status}; report={report_status}; {html}")
+```
+
+worker 函数应定义在模块顶层，并保留 `__main__` 保护；请作为 `.py` 脚本运行，不直接放入 Notebook 单元格（参见 [Python 进程池要求](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor)）。各 `recording_id` 必须唯一，每份记录都要使用独立的**新输出目录**；同一受试者的不同任务或 session 也需区分。向子进程传文件路径，只返回简短状态和报告路径，避免跨进程传递 Raw 或 PipelineResult 大对象。
+
+建议先用两个进程、每次 `n_threads=1`，再根据内存增加进程数；每个进程仍会加载完整记录及处理缓冲。环境变量用于减少嵌套数值线程；`n_threads` 不保证整个进程严格只有指定数量的线程。绘图和日志具有进程级状态，因此并发调用流程时使用独立进程。用于 ERP 时，在 worker 中设置 `purpose="erp"`、相应 `task_name`，并按前面的任务示例传入该记录的事件。
+
 ## 流程与输出
 
 ```mermaid
@@ -73,6 +119,8 @@ flowchart TB
     D --> I[HTML 人工复核]
     I -->|不重新拟合即可续处理| E
 ```
+
+上方快速开始示例的输出：
 
 ```text
 outputs/sub01_rest/
