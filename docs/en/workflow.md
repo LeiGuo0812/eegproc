@@ -278,6 +278,42 @@ Provide the original prepared FIF or the unchanged original Raw. Compatibility c
 
 Continuation reuses filtering, ASR, the ICA fit and ICLabel results. It reuses the parent checkpoint rather than writing another full copy. Checkbox edits alone do not modify saved FIFs; the original report's labels and plots describe its saved result until a new run is created.
 
+## Standalone epoching
+
+```mermaid
+flowchart TB
+    accTitle: Standalone epoch construction and QC
+    accDescr: Read cleaned Raw and embedded BAD origins, build requested epochs and save retained trials without repeating continuous preprocessing.
+    cleaned_raw["Cleaned MNE Raw"] --> bad_origins["Read BAD origins"]
+    bad_origins --> resolve_events["Resolve epoch request"]
+    resolve_events --> construct_epochs["Construct epochs"]
+    construct_epochs --> epoch_qc["Run epoch QC"]
+    epoch_qc --> save_epochs["Save retained epochs"]
+    save_epochs --> report_output["Deliver epoch report"]
+    source_report["Previous report or package"] -.-> report_output
+```
+
+`epoch()` uses the same epoch kernel as stage 7. It does not repeat line cleaning, channel detection, filters, ASR or ICA. The cleaned Raw/FIF carries the global bad-channel list, relevant epoch defaults and minimal automatic-residual origins. Existing, manual and unknown BAD remain protected. The source Raw is unchanged; only the Epochs receive baseline correction or optional bounded repair.
+
+The source report is optional and supplies presentation material, not BAD decisions or required original data. An explicit source takes priority over a same-directory HTML/package and the Raw's report-path hint. Missing or unreadable sources warn and produce an independent epoch report. Choose the correct source yourself; no recording-identity matching is added. New combined HTML keeps the original report by default.
+
+## Immediate or delayed report delivery
+
+```mermaid
+flowchart TB
+    accTitle: Immediate and delayed report delivery
+    accDescr: Collect bounded diagnostic material once, then either render HTML immediately or save one package for later rendering.
+    collect_data["Collect diagnostic data"] --> report_enabled{"report=True?"}
+    report_enabled -->|Yes| draw_now["Draw report figures"]
+    draw_now --> html_now["Write HTML"]
+    report_enabled -->|No| package["Save report-data package"]
+    package --> render_later["Call render_report"]
+    render_later --> draw_later["Draw stored diagnostics"]
+    draw_later --> html_later["Write HTML later"]
+```
+
+Both `run()` and `epoch()` default to immediate HTML. `report=False` saves one `*_report_data.npz`, with no drawing or HTML during processing. Representative before/after windows, spectrum summaries, ICA diagnostics and QC records are retained; a full original Raw is not copied. Rendering does not rerun denoising or epoch QC. Existing HTML can also be rendered again using its embedded figures. Scientific defaults and the four-second waveform display window are unchanged.
+
 ## Input and delivered files
 
 ### Result files
@@ -316,4 +352,4 @@ flowchart TB
 
 `pre_ica_raw.fif` contains the analysis-band signal before IC subtraction. `decomposition-ica.fif` is the frozen model; `checkpoint.json` records continuation settings, identity checks and report data.
 
-The normal completed ICA run contains **six files**: three result files and the three-file checkpoint. Retained epochs add one file. Review-only mode creates HTML plus the checkpoint; ICA-disabled runs have neither model nor checkpoint. Large FIFs may have numbered parts. No `original_raw.fif`, `preview_raw.fif`, stage-by-stage snapshots, or report image/table attachments are generated. The optional `selection.json` is downloaded by the reviewer.
+The normal completed ICA run contains **six files**: three result files and the three-file checkpoint. Retained epochs add one file. With `report=False`, the report-data package replaces the immediate HTML. Review-only mode creates the report or deferred package plus the checkpoint; ICA-disabled runs have neither model nor checkpoint. Standalone epoching writes retained epoch FIF and one HTML or package, without a continuous-data or ICA copy. Large FIFs may have numbered parts. No `original_raw.fif`, `preview_raw.fif`, stage-by-stage snapshots, or report image/table attachments are generated. The optional `selection.json` is downloaded by the reviewer.

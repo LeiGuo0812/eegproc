@@ -36,7 +36,9 @@ def inspect_artifacts(wheel, sdist):
         assert 'eegproc/resources/LICENSE-MNE.txt' in names
         assert 'eegproc/resources/PROVENANCE.json' in names
         assert not any(Path(name).parts[0] in {'eeg_pipeline', 'mne_asr'} for name in names)
-        for name in ('eegproc/prepare_cli.py', 'eegproc/io/neuracle.py', 'eegproc/cli.py'):
+        for name in ('eegproc/prepare_cli.py', 'eegproc/io/neuracle.py', 'eegproc/cli.py',
+                     'eegproc/epoch_cli.py', 'eegproc/report_cli.py', 'eegproc/epoching.py',
+                     'eegproc/epoch_metadata.py', 'eegproc/report_data.py'):
             assert name in names, name
         metadata_name = next(name for name in names if name.endswith('.dist-info/METADATA'))
         metadata = Parser().parsestr(archive.read(metadata_name).decode('utf-8'))
@@ -44,6 +46,8 @@ def inspect_artifacts(wheel, sdist):
         entry_points = archive.read(entry_name).decode('utf-8')
         assert 'eegproc = eegproc.cli:main' in entry_points
         assert 'eegproc-prepare = eegproc.prepare_cli:main' in entry_points
+        assert 'eegproc-epoch = eegproc.epoch_cli:main' in entry_points
+        assert 'eegproc-report = eegproc.report_cli:main' in entry_points
         assert 'License :: OSI Approved :: BSD License' in metadata.get_all('Classifier', [])
         project_license = [name for name in names
                            if '.dist-info/' in name and name.endswith('/LICENSE')]

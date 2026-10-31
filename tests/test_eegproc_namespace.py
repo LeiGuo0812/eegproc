@@ -11,9 +11,16 @@ import pytest
 
 import eegproc
 from eegproc import compatibility
+from frozen_manifests import annotation_v031_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.fixture(autouse=True)
+def isolate_epoch_transition_pin(monkeypatch):
+    """Namespace transition tests exercise their own source/target pin only."""
+    monkeypatch.setattr(compatibility, 'VERIFIED_EPOCH_TARGET_SHA256', None)
 
 
 def test_distribution_import_and_console_names_are_eegproc():
@@ -22,7 +29,7 @@ def test_distribution_import_and_console_names_are_eegproc():
     assert metadata['project']['scripts']['eegproc'] == 'eegproc.cli:main'
     assert metadata['project']['scripts']['eegproc-prepare'] == 'eegproc.prepare_cli:main'
     assert metadata['project']['urls']['Repository'] == 'https://github.com/LeiGuo0812/eegproc'
-    assert eegproc.__version__ == '0.4.0a2'
+    assert eegproc.__version__ == '0.4.0a3'
 
 
 
@@ -44,10 +51,7 @@ def test_manifest_hashes_real_code_under_stable_canonical_keys():
 
 
 def _previous_annotation_manifest():
-    prior = copy.deepcopy(compatibility.computation_manifest())
-    prior['source_files_sha256']['eeg_pipeline/engine.py'] = 'bed1f8dc5c9fed88de1b2f65a68b402190592365116c753bdcee79b31ab19cd9'
-    prior['source_files_sha256']['eeg_pipeline/review.py'] = '3242464b8d4feed507142baf4fb88821c0b58590456b7e73d6e10bea76b26dec'
-    prior['source_bundle_sha256'] = compatibility._bundle(prior['source_files_sha256'])
+    prior = annotation_v031_manifest()
     assert prior['source_bundle_sha256'] == compatibility.ANNOTATION_V031_SOURCE_SHA256
     return prior
 

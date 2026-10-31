@@ -12,6 +12,7 @@ After installation, run these scripts from a repository checkout:
 
 ```bash
 python examples/synthetic_demo.py --output outputs/demo
+python examples/epoch_and_report.py --output outputs/epoch_demo
 python examples/analyze_outputs.py --raw outputs/demo/rest/synthetic_cont_raw.fif --output analysis/demo_rest
 python examples/analyze_outputs.py --epochs outputs/demo/erp/synthetic_clean-epo.fif --output analysis/demo_erp
 ```
@@ -176,6 +177,74 @@ Event-window QC keeps all original manual BAD annotations. Only `BAD_residual` a
 
 Use `epoch_qc="annotations"` to apply ordinary continuous BAD rejection. `epoch_qc="auto"` means event-window QC for event epochs and annotation rejection for fixed epochs. `repair_epochs=False` is the default: failing trials are rejected without local interpolation. Optional `repair_epochs=True` requires the AutoReject extra and ERP event-window QC; bounded local repair changes exported epochs only. See the [parameter reference](parameters.md) for repair limits.
 
+## Standalone epoching
+
+Call `epoch()` on a cleaned Raw returned by `run()` or read from its continuous FIF. It uses the same epoch QC as integrated preprocessing, without repeating line cleaning, filtering, ASR, ICA fitting or component subtraction. The original prepared recording is not required.
+
+```python
+import mne
+from eegproc import epoch
+
+clean = mne.io.read_raw_fif("outputs/sub01/sub01_cont_raw.fif", preload=False)
+events, _ = mne.events_from_annotations(clean, event_id={"1": 1, "2": 2})
+seg = epoch(
+    clean, "outputs/sub01_epochs", "sub01",
+    events=events, event_id={"condition_1": 1, "condition_2": 2},
+    tmin=-0.2, tmax=1.0, baseline=(-0.2, 0.0),
+    epoch_qc="event-window", repair_epochs=False,
+)
+epochs = seg.epochs
+print(seg.status, seg.outputs)
+```
+
+Select only actual stimulus conditions, not trial-end markers. Events use absolute MNE sample indices. Alternatively select names with `event_source="annotations", event_names=("1", "2")`, or use a real STIM channel with `event_source="stim", stim_channel="STI 014"`.
+
+```python
+fixed = epoch(
+    clean, "outputs/sub01_fixed", "sub01",
+    epoch_mode="fixed", fixed_epoch_duration=2.0, fixed_epoch_overlap=0.0,
+)
+```
+
+`tmin`, `tmax` and `baseline` are short forms of `epoch_tmin`, `epoch_tmax` and `epoch_baseline`. Existing long forms and scientific controls remain available. Related QC defaults and global bad-channel information are inherited from the cleaned Raw; explicit settings override inherited values. Fixed windows use no baseline. Epoching retains the recording's actual filter band and cannot restore frequencies removed earlier.
+
+New continuous FIFs retain minimal BAD-origin information and epoch settings. Original annotations and user extras are preserved. Input, manual and unknown BAD remain exclusions, including input annotations named `BAD_residual`. Event-window QC reevaluates only marked automatic residuals; annotation mode rejects all BAD overlaps. Legacy cleaned FIFs without source information use conservative handling and issue a warning. ICA checkpoint continuation, unlike standalone epoching, still requires the matching prepared input.
+
+`source_report=None` looks beside a loaded `*_cont_raw.fif` for a matching `*_report.html` or `*_report_data.npz`, then uses the preprocessing API's report-path hint. Pass `source_report="outputs/sub01/sub01_report.html"` to select a source explicitly. Missing or unreadable reports warn without preventing epoching. Existing figures and ICA diagnostics are reused; only the new epoch content is generated. Select the correct report: no recording-identity matching is performed.
+
+Source HTML is kept by default (`keep_source_report=True`). With `keep_source_report=False`, it is deleted only after a new combined HTML is written successfully, never while reporting is deferred. Outputs are retained epoch FIF plus one HTML or report package; there are no QC JSON, image/table sidecars or copies of continuous Raw/ICA. Skipped or all-rejected requests are reported without writing an empty epoch file.
+
+## Immediate and delayed reports
+
+`run()` and `epoch()` default to `report=True`. With `report=False`, processing collects bounded diagnostic data without drawing figures or writing HTML. One `*_report_data.npz` replaces the immediate HTML. It contains representative before/after waveform windows, spectrum summaries, ICA diagnostics and QC records, not a full original recording.
+
+```python
+from eegproc import run, epoch, render_report
+
+prep = run(raw, "outputs/sub01_deferred", "sub01", purpose="erp",
+           task_name="oddball", report=False)
+seg = epoch(
+    prep.raw, "outputs/sub01_deferred_epochs", "sub01",
+    events=events, event_id={"standard": 1, "target": 2},
+    tmin=-0.2, tmax=1.0, report=False,
+)
+render_report(prep, "outputs/sub01_deferred/sub01_report.html")
+render_report(seg, "outputs/sub01_deferred_epochs/sub01_report.html")
+```
+
+In a later session, pass the saved package:
+
+```python
+render_report(
+    "outputs/sub01_deferred_epochs/sub01_report_data.npz",
+    "outputs/sub01_deferred_epochs/sub01_report.html",
+)
+```
+
+The target HTML must be new. Rendering does not repeat preprocessing or epoch QC. Stored diagnostics can be drawn later, but original intervals that were never captured cannot be recovered. `report_status="deferred"` means HTML was intentionally postponed. Immediate reports do not create an additional report-data package.
+
+`run()`, `epoch()` and `resume()` use the same result fields: `.raw`, `.epochs`, `.report`, `.outputs` and `.status`. Missing data products are `None`. Integrated runs can load saved epochs on demand through `.epochs`; standalone `epoch()` exposes its computed Epochs through the same attribute. `render_report()` returns the HTML path. The [complete generated-data example](../../examples/epoch_and_report.py) includes FIF read-back and both deferred reports.
+
 ## Configuration in code
 
 ```python
@@ -308,11 +377,14 @@ eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/rest --subject su
 eegproc --input-fif prepared/sub01_task_raw.fif --save-path outputs/erp --subject sub01 --purpose erp --task-name oddball --epochs --events-json prepared/sub01_task_raw.events.json
 eegproc --resume outputs/rest/sub01_ica_review/checkpoint.json --ica-exclude 1 4 --save-path outputs/revised --subject sub01 --original-fif prepared/sub01_raw.fif
 eegproc-prepare --input device_data/sub01.vhdr --output-fif prepared/sub01_raw.fif --montage standard_1020 --eog VEOG --ecg ECG
+eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/deferred --subject sub01 --purpose rest --no-report
+eegproc-epoch --input-fif outputs/deferred/sub01_cont_raw.fif --save-path outputs/epochs --subject sub01 --events-json prepared/sub01.events.json --tmin -0.2 --tmax 1.0 --no-report
+eegproc-report --source outputs/epochs/sub01_report_data.npz --output outputs/epochs/sub01_report.html
 ```
 
 `python -m eegproc` uses the same preprocessing CLI. Rare settings can be supplied as `--set key=JSON`, for example `--set ica_max_iter=4096`. Preparation and preprocessing are separate commands. Prepared event JSON contains `{"events": [[sample, 0, code], ...], "event_id": {"condition": code}}`; this illustration is a schema, not literal valid JSON with ellipses. Select actual stimulus conditions rather than exporting trial-end markers as analysis events.
 
-Rebuild only the presentation from an existing HTML:
+Rebuild the presentation from an existing HTML, or render a delayed package as shown above:
 
 ```python
 from eegproc import render_report

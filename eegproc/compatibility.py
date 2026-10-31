@@ -23,7 +23,8 @@ SOURCE_PATHS = {
     **{f'eeg_pipeline/{name}.py': (f'eegproc/{name}.py', f'eeg_pipeline/{name}.py') for name in (
         '_utils', 'backends', 'checkpoint_input', 'configuration', 'delivery',
         'engine', 'epochs', 'ica', 'raw_helpers', 'review', 'settings',
-        'signal_ops', 'stages', 'storage', 'parameter_resolution', 'runtime_parameters')},
+        'signal_ops', 'stages', 'storage', 'parameter_resolution', 'runtime_parameters',
+        'epoching', 'epoch_metadata')},
     'eeg_pipeline/epoch_export.py': ('eegproc/epoch_export.py', 'eeg_pipeline/epoch_export.py', 'erp_outputs.py'),
     **{f'eeg_pipeline/mne_asr/{name}.py': (
         f'eegproc/mne_asr/{name}.py', f'eeg_pipeline/mne_asr/{name}.py', f'python/common/mne_asr/{name}.py')
@@ -51,6 +52,10 @@ VERIFIED_ANNOTATION_TARGET_SHA256 = '2c490917fc68b6e29156787ba49fdaa3031194f8d26
 # in results/eegproc_rename_20261022/{comparison.json,transitions/summary.json}.
 ANNOTATION_V031_SOURCE_SHA256 = VERIFIED_ANNOTATION_TARGET_SHA256
 VERIFIED_RENAME_TARGET_SHA256 = '028ffbd7836d8b2fe61396441a65a643619fb5184f218bd80d8d9407e2fee9d6'
+PACKAGED_V040_SOURCE_SHA256 = VERIFIED_RENAME_TARGET_SHA256
+# Frozen 0.4.0a2 continuation verified in epoch_feature_20261031: continuous
+# and epoch differences below 5e-19 V; no ICA refit. Pins remain exact.
+VERIFIED_EPOCH_TARGET_SHA256 = 'e4c8e8230a6371eca4a269d5b25da070f00ca06999bd43a4f1b24fe43f3a2c7f'
 LEGACY_V2_SOURCE_FILES = {
     "eeg_pipeline/_utils.py": "560369b76e2d1d91fa79f4cf5c23daae093a3c2acbbdb48ed1b3deacde229d4a",
     "eeg_pipeline/backends.py": "6baa4dd3ddafebed91086a1f1be88909eec963e91e7919cced05484c9b00e218",
@@ -116,6 +121,8 @@ def _verified_transitions():
     """Only explicit source/target pairs; no version-wide compatibility bypass."""
     legacy=_bundle(LEGACY_V2_SOURCE_FILES)
     result={}
+    if VERIFIED_EPOCH_TARGET_SHA256:
+        result[(PACKAGED_V040_SOURCE_SHA256,VERIFIED_EPOCH_TARGET_SHA256)]='verified-0.4.0a2-to-standalone-epochs'
     if VERIFIED_RENAME_TARGET_SHA256:
         for source,label in ((legacy,'0.2.0'),
                              (PACKAGED_V030_SOURCE_SHA256,'0.3.0'),

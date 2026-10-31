@@ -40,18 +40,12 @@ def screen(data, cfg):
 
 
 def _restore_input_annotations(clean, original):
-    """Copy attached annotations without double-applying first_time."""
-    if clean.first_samp!=original.first_samp or clean.n_times!=original.n_times or clean.info['sfreq']!=original.info['sfreq']:
-        raise ValueError('ERP repair needs original input on the identical sample grid')
-    result=clean.copy()
-    ann=original.annotations.copy()
-    if ann.orig_time is None:
-        ann.onset-=original.first_time
-    result.set_annotations(ann)
-    return result
+    """Use the same protected BAD union as strict event-window QC."""
+    from .epoch_export import _epoch_base
+    return _epoch_base(clean,original,'event-window')[0]
 
 
-def repair_epochs(clean, original, events, event_id, *, global_bads=(), config=None, save_path=None, subject='subject'):
+def repair_epochs(clean, original=None, events=None, event_id=None, *, global_bads=(), config=None, save_path=None, subject='subject'):
     """Return MNE Epochs, per-input-event log and fitted AutoReject diagnostics.
 
     Events use MNE absolute sample indices. No condition labels, truth, ERP

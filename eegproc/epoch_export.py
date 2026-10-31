@@ -13,8 +13,12 @@ from .epochs import EpochConfig,screen
 
 
 def _annotation_key(annotation):
+    # Our optional source hint must not make an otherwise identical input BAD
+    # look new when a processed recording is deliberately processed again.
+    from .epoch_metadata import ORIGIN_KEY
+    extras={k:v for k,v in annotation.get('extras',{}).items() if k!=ORIGIN_KEY}
     return (float(annotation['onset']),float(annotation['duration']),annotation['description'],
-            tuple(annotation.get('ch_names',())),json.dumps(dict(annotation.get('extras',{})),sort_keys=True))
+            tuple(annotation.get('ch_names',())),json.dumps(extras,sort_keys=True))
 
 
 def _epoch_base(clean,original,policy):
@@ -24,19 +28,31 @@ def _epoch_base(clean,original,policy):
     the input is necessary: a pre-existing label named BAD_residual must survive.
     Neither supplied Raw is mutated; first_samp and absolute clock are checked.
     """
+    from .epoch_metadata import is_automatic_residual, ORIGIN_KEY
+    if policy not in ('event-window','annotations'):
+        raise ValueError('Unknown epoch annotation policy')
+    if original is None:
+        keep=[];ignored=0
+        for index, annotation in enumerate(clean.annotations):
+            if policy=='event-window' and is_automatic_residual(annotation):
+                ignored+=1
+            else:
+                keep.append(index)
+        ann=clean.annotations[keep]
+        if ann.orig_time is None:ann.onset-=clean.first_time
+        return clean.copy().set_annotations(ann),ignored
     if (clean.first_samp!=original.first_samp or clean.n_times!=original.n_times
             or clean.info['sfreq']!=original.info['sfreq']
             or clean.info['meas_date']!=original.info['meas_date']
             or clean.annotations.orig_time!=original.annotations.orig_time):
         raise ValueError('ERP export needs original input on the identical sample grid and clock')
-    if policy not in ('event-window','annotations'):
-        raise ValueError('Unknown epoch annotation policy')
     remaining=Counter(_annotation_key(a) for a in original.annotations)
     added=[];ignored=0
     for i,a in enumerate(clean.annotations):
         key=_annotation_key(a)
         if remaining[key]:remaining[key]-=1
-        elif policy=='event-window' and a['description']=='BAD_residual':ignored+=1
+        elif (policy=='event-window' and a['description']=='BAD_residual'
+                and a.get('extras',{}).get(ORIGIN_KEY) in (None,'automatic_residual')):ignored+=1
         else:added.append(i)
     # Union with original labels even if a caller accidentally lost them.
     ann=original.annotations.copy()
@@ -46,7 +62,7 @@ def _epoch_base(clean,original,policy):
     return base,ignored
 
 
-def make_strict_epochs(clean,original,events,event_id,*,global_bads=(),config=None,save_path=None,subject='subject',
+def make_strict_epochs(clean,original=None,events=None,event_id=None,*,global_bads=(),config=None,save_path=None,subject='subject',
                        annotation_policy='event-window'):
     cfg=config or EpochConfig()
     if (not cfg.tmin<=0<cfg.tmax or not np.isfinite([cfg.tmin,cfg.tmax,cfg.peak_uv,cfg.ptp_uv,
@@ -70,7 +86,8 @@ def make_strict_epochs(clean,original,events,event_id,*,global_bads=(),config=No
                         else 'Continuous annotation rejection, no trial-local screen'),config=asdict(cfg),
         annotation_policy=annotation_policy,event_window_qc_enabled=annotation_policy=='event-window',
         newly_generated_residual_annotations_ignored=ignored,
-        input_BAD_annotation_count=sum(a['description'].lower().startswith('bad') for a in original.annotations),
+        input_BAD_annotation_count=sum(a['description'].lower().startswith('bad') for a in
+                                      (original.annotations if original is not None else base.annotations)),
         annotation_or_boundary_rejected_epochs=len(events)-len(selection),
         qc_channels=[epochs.ch_names[i] for i in good],
         source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),input_events=len(events),

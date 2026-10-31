@@ -19,7 +19,9 @@ outputs/sub01/
 
 Optional retained epochs add `sub01_clean-epo.fif`. If all trials are rejected, no empty epoch FIF is written. Review mode produces the HTML and three checkpoint files; it has not yet produced a final cleaned recording. ICA-disabled runs produce neither ICA model nor checkpoint. Continuation reuses the parent checkpoint and writes a new result family. Large FIF files may split into numbered parts; retain every part in the output inventory.
 
-There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or image/table sidecar. Keep the prepared input separately because continuation verifies that input. `pre_ica_raw.fif` is a recovery point **before IC subtraction**, not the unfiltered recording or a copy from before all preprocessing.
+With `report=False`, `sub01_report_data.npz` replaces the immediate HTML. It stores bounded plot data and QC records; `render_report()` draws them later without repeating preprocessing. An immediate-report run does not also save this package. A standalone epoch run contains only `sub01_clean-epo.fif` when trials remain and one report HTML or package; it does not copy the continuous recording or ICA checkpoint.
+
+There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or image/table sidecar. Keep the prepared input separately because ICA continuation verifies that input. Standalone epoching needs only the cleaned Raw/FIF, which carries BAD origins and the original global bad-channel list. `pre_ica_raw.fif` is a recovery point **before IC subtraction**, not the unfiltered recording or a copy from before all preprocessing.
 
 | `result.status` / report label | Meaning | Next action |
 |---|---|---|
@@ -29,6 +31,8 @@ There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or im
 | `failed` / Failed | Processing raised an error | Inspect the error/stage; partial artifacts do not establish completion. |
 
 Processing, delivery and report-generation status are also recorded separately. A usable FIF can exist even if a later report or epoch stage fails. A report existing on disk does not guarantee every requested stage completed.
+
+`report_status="deferred"` means reporting was deliberately postponed; use the saved report-data package to generate HTML. A standalone epoch request without usable events has a skipped epoch resolution; an all-rejected request has zero retained trials and no epoch FIF. In both cases, the HTML or package records the reason. `.epochs` exposes the epoch result, while `.outputs` lists only files actually produced.
 
 ## Read the report in this order
 
@@ -83,6 +87,8 @@ The **Exclude** checkboxes, including those in details, define the *next* exclus
 The bar plot and table show each condition's input count, annotation/boundary rejections, additional QC rejections and retained count. The detailed event table lists original event index/sample, condition and rejection reason. Compare conditions and participants: unequal loss can create differential precision or selection bias even when total retention looks good.
 
 Event-window QC preserves input manual BAD and tests the actual requested event window after setting aside only newly generated `BAD_residual`. Fixed-window/default annotation QC instead uses the continuous BAD decision. Optional local repair is reported separately and changes epochs only. Review retention together with ERP shape and residual artifacts; maximizing trial count is not the sole objective.
+
+The same rules apply when `epoch()` is called later. Original and unknown BAD are not released solely because their description is `BAD_residual`; only marked automatic residuals are eligible for event-window reevaluation. A warning about missing legacy origin information means conservative annotation handling is in use. A warning about a missing source report concerns report reuse, not repeated denoising. A combined report reuses the original preprocessing section as its historical record and adds the current epoch results; it does not redraw old continuous plots to incorporate later manual annotations.
 
 ### 7. Methods, References and About
 

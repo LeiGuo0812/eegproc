@@ -227,11 +227,16 @@ API = {
 | Interface | Inputs and returned objects |
 |---|---|
 | run | raw: continuous MNE BaseRaw; EEG/EOG/ECG in volts; input unchanged. save_path: output directory; subject: safe filename prefix. config/config_file: sources above. montage: explicit geometry override on the working copy; omit it to preserve existing digitization. collect_stages=False avoids extra stage copies. events: integer n×3, first column absolute MNE samples including first_samp. event_id: condition name → integer. epoch_config: stage overrides. invocation: provenance mapping. Additional keywords: all PipelineConfig fields. |
-| PipelineResult | raw: cleaned Raw, or None while awaiting ICA review; report: diagnostics dictionary; stages: requested in-memory snapshots; status: run status; outputs: actual product paths. review_required means assess flagged quality before downstream analysis. |
+| epoch | raw: already preprocessed continuous MNE Raw; no original input needed and no continuous preprocessing repeated. save_path: new output directory; subject: optional filename prefix. events/event_id follow run's MNE sample convention. tmin/tmax/baseline alias epoch_tmin/epoch_tmax/epoch_baseline. config/config_file, epoch_config and related QC controls remain available. source_report=None discovers the previous HTML/package, a path selects one explicitly. keep_source_report=True retains source HTML. report defaults True; False defers figures/HTML. |
+| PipelineResult | raw: continuous result or None when unavailable; epochs: epoch result or None, loaded on demand for integrated runs; report: diagnostics dictionary; stages: requested in-memory snapshots; status: processing status; outputs: actual product paths. review_required means assess flagged quality before downstream analysis. |
 | resume | checkpoint: checkpoint.json; save_path: new output family; subject: optional prefix. Either selection_json or exclude: a complete zero-based list, [] keeps all. reviewer/reason record the decision. original_raw or original_fif supplies matching original data; required explicitly for an in-memory origin or moved source. collect_stages defaults False. Reuses ICA/ICLabel; no change of scientific parameters. |
-| render_report | source: PipelineResult or saved HTML; report_path: fresh HTML path. Rebuilds layout using embedded diagnostics, without reprocessing EEG. |
+| render_report | source: PipelineResult, saved HTML or report-data NPZ; report_path: fresh HTML path. Reuses saved figures or draws collected diagnostics without repeating preprocessing or epoch QC. Returns the HTML path. |
 | resolve_config | path: optional JSON path, mapping or PipelineConfig; keyword overrides have highest priority. Returns an immutable PipelineConfig; no configuration file is discovered implicitly. |
 | prepare_data | source: supported file or Neuracle directory; output_fif=None returns data only, a path also writes FIF/.events.json/.preparation.json. channel_types and rename are mappings; drop is a channel-name sequence; montage is actual electrode geometry; event_id maps annotation descriptions to integer codes. allow_legacy_uv_per_mm=False applies only to confirmed legacy Neuracle calibration. return_result=False returns Raw; True returns PreparationResult(raw, events, event_id, provenance, outputs). No filtering, referencing or cleaning is performed. |
+
+## Reporting controls
+
+These are runtime arguments, not additional PipelineConfig fields. run and epoch default to report=True. report=False collects bounded diagnostic material and writes one *_report_data.npz, without drawing or HTML; immediate mode writes HTML without an extra package. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a new combined HTML succeeds, never during deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
 
 ## Complete CLI flags
 
@@ -243,11 +248,16 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 | 接口 | 输入与返回值 |
 |---|---|
 | run | raw：连续 MNE BaseRaw，EEG/EOG/ECG 单位 V，输入不变。save_path：输出目录；subject：安全文件名前缀。config/config_file：上述配置来源。montage：显式提供时替换工作副本的电极几何；保留既有实测坐标时请省略。collect_stages=False 避免额外阶段副本。events：n×3 整数数组，第一列为包含 first_samp 的绝对 MNE 样本。event_id：条件名→整数码。epoch_config：分段覆盖。invocation：调用来源字典。其他关键字：全部 PipelineConfig 字段。 |
-| PipelineResult | raw：清理后的 Raw，等待 ICA 复核时为 None；report：诊断字典；stages：要求收集的内存快照；status：运行状态；outputs：实际输出路径。review_required 表示后续分析前需判断报告中的质量问题。 |
+| epoch | raw：已完成连续预处理的 MNE Raw，无需原输入，不重复连续预处理。save_path：新目录；subject：可选文件名前缀。events/event_id 与 run 使用相同 MNE 样本约定。tmin/tmax/baseline 是 epoch_tmin/epoch_tmax/epoch_baseline 的短写。可传 config/config_file、epoch_config 和相关 QC 参数。source_report=None 自动寻找此前 HTML／报告包，路径表示手动指定。keep_source_report=True 保留原 HTML；report 默认 True，False 延迟绘图及 HTML。 |
+| PipelineResult | raw：连续结果，不可用时 None；epochs：分段结果或 None，整段流程可按需读取；report：诊断字典；stages：要求收集的内存快照；status：处理状态；outputs：实际输出路径。review_required 表示后续分析前需判断报告中的质量问题。 |
 | resume | checkpoint：checkpoint.json；save_path：新输出位置；subject：可选前缀。selection_json 与 exclude 二选一，后者为完整 0 起始列表，[] 全保留。reviewer/reason 记录人工决策。original_raw 或 original_fif 提供身份匹配的原始数据；内存输入或原文件移动时应显式提供。collect_stages 默认 False。不重复 ICA/ICLabel，不修改科学参数。 |
-| render_report | source：PipelineResult 或已有 HTML；report_path：新 HTML 路径。使用内嵌诊断重建布局，不重新处理 EEG。 |
+| render_report | source：PipelineResult、已有 HTML 或报告数据 NPZ；report_path：新 HTML 路径。复用已有图片或绘制已采集诊断，不重跑预处理或分段 QC，返回 HTML 路径。 |
 | resolve_config | path：可选 JSON 路径、字典或 PipelineConfig；关键字覆盖优先级最高。返回不可变 PipelineConfig，不隐式查找文件。 |
 | prepare_data | source：支持的文件或 Neuracle 目录；output_fif=None 仅返回内存数据，指定路径还输出 FIF/.events.json/.preparation.json。channel_types、rename 为映射；drop 为通道名序列；montage 为实际几何；event_id 为标注描述→整数码。allow_legacy_uv_per_mm=False 仅针对已确认的旧 Neuracle 校准。return_result=False 返回 Raw；True 返回 PreparationResult(raw, events, event_id, provenance, outputs)。不滤波、不参考、不清理。 |
+
+## 报告控制
+
+以下为运行参数，不增加 PipelineConfig 字段。run 与 epoch 均默认 report=True。report=False 采集有限诊断素材并写一个 *_report_data.npz，不绘图、不写 HTML；即时模式写 HTML，不额外写包。epoch 的来源报告为可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并 HTML 成功后删除旧 HTML，延迟交付不提前删除。自动查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
 
 ## 全部 CLI 参数
 
@@ -256,11 +266,13 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 
 
 def make_reference(language):
-    from eegproc import PipelineConfig, run, resume, render_report, resolve_config
+    from eegproc import PipelineConfig, run, epoch, resume, render_report, resolve_config
     from eegproc.mne_asr import ASRConfig
     from eegproc.epochs import EpochConfig
     from eegproc.preparation import prepare_data
     from eegproc.cli import parser
+    from eegproc.epoch_cli import parser as epoch_parser
+    from eegproc.report_cli import parser as report_parser
 
     configs = [PipelineConfig(preset=preset, purpose=purpose)
                for preset in ("standard", "eeglab") for purpose in ("rest", "erp")]
@@ -281,12 +293,12 @@ print(config.adjustments)
     result += "## 全部流程字段\n\n" if language == "zh-CN" else "## All pipeline fields\n\n"
     result += table(PipelineConfig, DESCRIPTIONS, language, configs) + "\n" + POLICY[language]
     result += "\n" + table(ASRConfig, ASR_DESCRIPTIONS, language)
-    result += ("\n\n## 高级分段参数\n\n通过 run 的 epoch_config 传字典或 EpochConfig。完整对象覆盖所有分段默认值，字典仅覆盖给定字段，不修改连续 QC。固定窗强制 tmin=0、tmax=duration−1/sfreq、baseline=None。修复预算/CV 仅 repair_epochs=True 时启用，默认关闭局部修复。下表为独立类默认值；流程继承关系见说明列。\n\n"
+    result += ("\n\n## 高级分段参数\n\n通过 run 或 epoch 的 epoch_config 传字典或 EpochConfig。完整对象覆盖所有分段默认值，字典仅覆盖给定字段，不修改连续 QC。固定窗强制 tmin=0、tmax=duration−1/sfreq、baseline=None。修复预算/CV 仅 repair_epochs=True 时启用，默认关闭局部修复。下表为独立类默认值；流程继承关系见说明列。\n\n"
                if language == "zh-CN" else
-               "\n\n## Advanced epoch parameters\n\nPass a mapping or EpochConfig through run's epoch_config. A complete object overrides all stage defaults; a mapping overrides supplied fields only. Continuous QC is unchanged. Fixed windows force tmin=0, tmax=duration−1/sfreq, baseline=None. Repair budget/CV require repair_epochs=True; repair is off by default. The table shows standalone class defaults; inherited pipeline values are described separately.\n\n")
+               "\n\n## Advanced epoch parameters\n\nPass a mapping or EpochConfig through run's or epoch's epoch_config. A complete object overrides all stage defaults; a mapping overrides supplied fields only. Continuous QC is unchanged. Fixed windows force tmin=0, tmax=duration−1/sfreq, baseline=None. Repair budget/CV require repair_epochs=True; repair is off by default. The table shows standalone class defaults; inherited pipeline values are described separately.\n\n")
     result += table(EpochConfig, EPOCH_DESCRIPTIONS, language)
     result += "\n\n"
-    for function in (run, resume, render_report, resolve_config, prepare_data):
+    for function in (run, epoch, resume, render_report, resolve_config, prepare_data):
         result += f"{B*3}text\n{function.__name__}{inspect.signature(function)}\n{B*3}\n\n"
     result += API[language]
     result += "\n| Flags | Destination | Required |\n|---|---|---|\n"
@@ -296,8 +308,17 @@ print(config.adjustments)
     commands = """eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/sub01 --subject sub01 --purpose erp --task-name oddball --epochs --set report_window_seconds=4.0
 eegproc --input-fif prepared/sub02_raw.fif --save-path outputs/sub02 --subject sub02 --purpose rest --asr-cutoff off --set ica_enabled=false
 eegproc --resume outputs/review/sub01_ica_review/checkpoint.json --save-path outputs/revised --subject sub01 --ica-exclude 1 4 --original-fif prepared/sub01_raw.fif
+eegproc --input-fif prepared/sub03_raw.fif --save-path outputs/sub03 --subject sub03 --no-report
+eegproc-epoch --input-fif outputs/sub03/sub03_cont_raw.fif --save-path outputs/sub03_epochs --subject sub03 --events-json prepared/sub03.events.json --tmin -0.2 --tmax 1.0 --no-report
+eegproc-report --source outputs/sub03_epochs/sub03_report_data.npz --output outputs/sub03_epochs/sub03_report.html
 """
     result += f"\n{B*3}bash\n{commands}{B*3}\n"
+    for command, command_parser in (("eegproc-epoch", epoch_parser), ("eegproc-report", report_parser)):
+        result += f"\n### {B}{command}{B}\n\n"
+        result += "| Flags | Destination | Required |\n|---|---|---|\n"
+        for action in command_parser()._actions:
+            flags = " / ".join(B + flag + B for flag in action.option_strings)
+            result += f"| {flags} | {B}{action.dest}{B} | {bool(action.required)} |\n"
     result += ("\n### 数据准备命令\n\n" if language == "zh-CN" else "\n### Preparation command\n\n")
     result += f"{B}eegproc-prepare{B}\n\n"
     preparation = [

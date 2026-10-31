@@ -57,6 +57,30 @@ erp = run(
 | Epoch export | When requested | When requested |
 | Report waveform window | 4 s | 4 s |
 
+## Epoch later and defer reports
+
+Use `epoch()` for an already preprocessed Raw. It performs only epoch construction and QC; it does not repeat filtering, ASR or ICA and does not require the original recording.
+
+```python
+from eegproc import run, epoch, render_report
+
+prep = run(task_raw, "outputs/sub01_prep", "sub01", purpose="erp",
+           task_name="oddball", report=False)
+seg = epoch(
+    prep.raw, "outputs/sub01_epochs", "sub01",
+    events=events, event_id={"standard": 1, "target": 2},
+    tmin=-0.2, tmax=1.0, baseline=(-0.2, 0.0), report=False,
+)
+render_report(seg, "outputs/sub01_epochs/sub01_report.html")
+epochs = seg.epochs
+```
+
+Both `run()` and `epoch()` default to `report=True`. With `report=False`, no figures or HTML are produced during processing; one `*_report_data.npz` stores bounded diagnostic material for later rendering. No full original Raw is copied. `render_report()` accepts a result, an existing HTML, or a report-data package.
+
+`epoch()` reads BAD origins and global bad-channel information from the cleaned Raw/FIF. Input, manual and unknown BAD remain exclusions; event-window QC reevaluates only marked automatic residuals. It automatically looks for the previous HTML or report-data package; use `source_report="path/to/report.html"` to select one explicitly. Missing or unreadable reports produce a warning and an independent epoch report. Source HTML is kept by default. See [standalone epoching and reports](docs/en/usage.md#standalone-epoching).
+
+The corresponding commands are `eegproc-epoch` and `eegproc-report`. Run [epoch_and_report.py](examples/epoch_and_report.py) for a complete generated-data example.
+
 ## Parallel processing
 
 Independent recordings can run concurrently in separate processes. `max_workers` selects the number of recordings processed at once; `n_threads` limits supported numerical-library thread pools within a recording and does not start batch workers. The included CSV batch example runs sequentially.
@@ -169,7 +193,7 @@ outputs/sub01_rest/
     └── checkpoint.json        Continuation state
 ```
 
-Requested epochs add `sub01_clean-epo.fif` when trials remain. Report figures and tables are embedded in the HTML. Continuous BAD annotations mark problematic intervals without deleting samples.
+Requested epochs add `sub01_clean-epo.fif` when trials remain. Report figures and tables are embedded in the HTML. With `report=False`, `sub01_report_data.npz` replaces the immediate HTML. Standalone `epoch()` writes only retained epoch FIF and an HTML or report-data package. Continuous BAD annotations mark problematic intervals without deleting samples.
 
 To review before subtraction, set `ica_mode="review"`. To revise an automatic result, open its report and change **Exclude** on an IC tile or its detail view. Download the selection and call `resume()` with the checkpoint. A new complete list can restore previously removed components; filtering, ASR and ICA fitting are reused. Keep the original prepared input and all checkpoint files. See [ICA review and continuation](docs/en/usage.md#ica-review-and-continuation).
 

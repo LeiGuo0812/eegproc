@@ -79,7 +79,7 @@ requirements 文件会安装本软件及依赖。应从仓库根目录执行，�
 若发布页面附带 wheel，下载目标版本后安装实际文件：
 
 ```bash
-python -m pip install eegproc-0.4.0a2-py3-none-any.whl
+python -m pip install eegproc-0.4.0a3-py3-none-any.whl
 ```
 
 依赖仍由 pip 解析下载。仅复制这个 wheel 到离线电脑并不足够，还需要全部依赖的安装包。
@@ -93,12 +93,14 @@ python -c "import eegproc; print(eegproc.__version__); print(eegproc.__file__)"
 python -m eegproc --help
 eegproc --help
 eegproc-prepare --help
+eegproc-epoch --help
+eegproc-report --help
 python -m pip check
 ```
 
 普通安装的 `eegproc.__file__` 应指向当前环境的 `site-packages`。在源码文件夹中导入成功，不能单独证明安装成功。如果命令行找不到 `eegproc`，请激活环境，或使用该环境解释器执行 `python -m eegproc`。
 
-接着运行[静息态示例](usage.md)。导入检查确认依赖可用；首次实际处理还会检查电极坐标、有效数据长度、信号秩和输入元数据。
+接着运行[静息态示例](usage.md)。导入检查确认依赖可用；首次实际处理还会检查电极坐标、有效数据长度、信号秩和输入元数据。普通安装已包含 `epoch()`／`eegproc-epoch` 和 `render_report()`／`eegproc-report`，严格独立分段与延迟报告不需额外依赖，局部分段修复仍需 `autoreject` extra。
 
 ## 4. 固定环境、升级与开发
 
@@ -124,8 +126,8 @@ python -m twine check dist/*
 干净环境验证脚本可由安装用户或 CI 执行；它会创建隔离环境并安装依赖：
 
 ```bash
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --output validation/clean-default
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a3-py3-none-any.whl --output validation/clean-default
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a3-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
 ```
 
 请使用新的输出目录。`--existing-environment-check` 只用现有环境验证功能，不安装依赖，也不代表干净环境安装通过。实际完成情况以[GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml)和 GitHub Actions 的真实运行结果为准。

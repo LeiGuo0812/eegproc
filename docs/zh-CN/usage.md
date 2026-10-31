@@ -12,6 +12,7 @@
 
 ```bash
 python examples/synthetic_demo.py --output outputs/demo
+python examples/epoch_and_report.py --output outputs/epoch_demo
 python examples/analyze_outputs.py --raw outputs/demo/rest/synthetic_cont_raw.fif --output analysis/demo_rest
 python examples/analyze_outputs.py --epochs outputs/demo/erp/synthetic_clean-epo.fif --output analysis/demo_erp
 ```
@@ -176,6 +177,74 @@ result = run(
 
 `epoch_qc="annotations"` 表示直接按连续 BAD 拒绝。`epoch_qc="auto"` 对事件分段采用事件窗质控，对固定片段采用连续注释。默认 `repair_epochs=False`，不合格试次直接拒绝，不做局部插值。可选 `repair_epochs=True` 需要 AutoReject 和 ERP 事件窗质控；有限度修复仅影响导出的 epochs，不覆盖连续数据。修复预算见[参数说明](parameters.md)。
 
+## 独立分段
+
+清理后的 Raw 可直接传给 `epoch()`，既可使用 `run()` 返回的对象，也可重新读取连续 FIF。独立入口与整段流程共用分段质控，不重复去工频、滤波、ASR、ICA 拟合或成分减除，不需要准备后的原始记录。
+
+```python
+import mne
+from eegproc import epoch
+
+clean = mne.io.read_raw_fif("outputs/sub01/sub01_cont_raw.fif", preload=False)
+events, _ = mne.events_from_annotations(clean, event_id={"1": 1, "2": 2})
+seg = epoch(
+    clean, "outputs/sub01_epochs", "sub01",
+    events=events, event_id={"condition_1": 1, "condition_2": 2},
+    tmin=-0.2, tmax=1.0, baseline=(-0.2, 0.0),
+    epoch_qc="event-window", repair_epochs=False,
+)
+epochs = seg.epochs
+print(seg.status, seg.outputs)
+```
+
+仅选择真实刺激条件，不包含试次结束标记。事件仍使用 MNE 绝对样本。也可设置 `event_source="annotations", event_names=("1", "2")` 选择注释条件，或通过 `event_source="stim", stim_channel="STI 014"` 指定实际 STIM 通道。
+
+```python
+fixed = epoch(
+    clean, "outputs/sub01_fixed", "sub01",
+    epoch_mode="fixed", fixed_epoch_duration=2.0, fixed_epoch_overlap=0.0,
+)
+```
+
+`tmin`、`tmax`、`baseline` 分别是 `epoch_tmin`、`epoch_tmax`、`epoch_baseline` 的短写；原长参数名及科学控制参数继续可用。相关 QC 默认值和全局坏导信息从清理后 Raw 继承，显式设置优先。固定片段不做基线校正。分段保留数据实际滤波频段，不能恢复此前去掉的频率。
+
+新连续 FIF 保存最少的 BAD 来源信息和分段设置，保留原有注释及用户 extras。原有、人工和未知来源 BAD 始终参与拒绝，包括输入已有同名 `BAD_residual`。事件窗模式只重新检查明确标记的自动残留，注释模式拒绝全部 BAD 重叠。旧清理 FIF 没有来源信息时保守处理并提醒。独立分段不依赖原输入；ICA 断点续处理仍需匹配的准备后输入。
+
+`source_report=None` 先查找已读取 `*_cont_raw.fif` 同目录同前缀的 `*_report.html` 或 `*_report_data.npz`，再使用预处理 API 保存的报告路径提示。也可通过 `source_report="outputs/sub01/sub01_report.html"` 手动指定。报告缺失或无法读取时提醒，不阻止分段；已有图像和 ICA 诊断直接复用，只生成新的分段内容。程序不核验报告归属，请选择对应文件。
+
+默认 `keep_source_report=True` 保留原 HTML。设为 `False` 时，仅在新的合并 HTML 成功写入后删除旧 HTML，延迟模式不提前删除。输出仅为保留的分段 FIF 和一个 HTML 或报告包，不生成 QC JSON、图片／表格附件，不复制连续 Raw 或 ICA。分段请求被跳过或全部拒绝时报告原因，不写空分段文件。
+
+## 即时与延迟报告
+
+`run()` 和 `epoch()` 均默认 `report=True`。设为 `report=False` 时，处理过程中只采集有限诊断数据，不绘图、不写 HTML，以一个 `*_report_data.npz` 替代即时 HTML。包中包含代表性处理前后波形、频谱摘要、ICA 诊断和 QC 记录，不含整份原始记录。
+
+```python
+from eegproc import run, epoch, render_report
+
+prep = run(raw, "outputs/sub01_deferred", "sub01", purpose="erp",
+           task_name="oddball", report=False)
+seg = epoch(
+    prep.raw, "outputs/sub01_deferred_epochs", "sub01",
+    events=events, event_id={"standard": 1, "target": 2},
+    tmin=-0.2, tmax=1.0, report=False,
+)
+render_report(prep, "outputs/sub01_deferred/sub01_report.html")
+render_report(seg, "outputs/sub01_deferred_epochs/sub01_report.html")
+```
+
+后续新会话中，直接传入已保存的数据包：
+
+```python
+render_report(
+    "outputs/sub01_deferred_epochs/sub01_report_data.npz",
+    "outputs/sub01_deferred_epochs/sub01_report.html",
+)
+```
+
+目标 HTML 必须为新文件。生成报告不会重跑预处理或分段质控，可绘制已保存的诊断素材，但无法恢复从未采集的原始时间窗。`report_status="deferred"` 表示有意延迟 HTML；即时报告不会额外生成报告包。
+
+`run()`、`epoch()`、`resume()` 使用相同结果字段：`.raw`、`.epochs`、`.report`、`.outputs`、`.status`。不存在的数据产物为 `None`；整段流程的 `.epochs` 可按需读取已保存 FIF，独立分段通过同一属性返回本次得到的 Epochs。`render_report()` 返回 HTML 路径。[完整生成数据示例](../../examples/epoch_and_report.py) 包含 FIF 重新读取和两阶段延迟报告。
+
 ## 通过代码配置
 
 ```python
@@ -308,11 +377,14 @@ eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/rest --subject su
 eegproc --input-fif prepared/sub01_task_raw.fif --save-path outputs/erp --subject sub01 --purpose erp --task-name oddball --epochs --events-json prepared/sub01_task_raw.events.json
 eegproc --resume outputs/rest/sub01_ica_review/checkpoint.json --ica-exclude 1 4 --save-path outputs/revised --subject sub01 --original-fif prepared/sub01_raw.fif
 eegproc-prepare --input device_data/sub01.vhdr --output-fif prepared/sub01_raw.fif --montage standard_1020 --eog VEOG --ecg ECG
+eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/deferred --subject sub01 --purpose rest --no-report
+eegproc-epoch --input-fif outputs/deferred/sub01_cont_raw.fif --save-path outputs/epochs --subject sub01 --events-json prepared/sub01.events.json --tmin -0.2 --tmax 1.0 --no-report
+eegproc-report --source outputs/epochs/sub01_report_data.npz --output outputs/epochs/sub01_report.html
 ```
 
 `python -m eegproc` 调用同一预处理入口。较少使用的设置可通过 `--set key=JSON` 传入，例如 `--set ica_max_iter=4096`。准备和预处理是两个独立命令。事件 JSON 的结构为 `{"events": [[sample, 0, code], ...], "event_id": {"condition": code}}`；这里是结构示意，省略号不能直接写进真实 JSON。应选择真实刺激条件，不要把试次结束标记当作刺激事件。
 
-仅重建已有报告的界面：
+重建已有报告界面，或使用前述数据包生成延迟报告：
 
 ```python
 from eegproc import render_report

@@ -47,10 +47,14 @@ def save_checkpoint(original,current,analysis,preview,model,config,report,direct
     del pre_ica
     # Persist only component plots and downsampled numeric diagnostics, never
     # another original or training-preview recording.
-    with style(report.get('config',{})):
-        figures,notes=ica_figures(report,folder,model,preview)
-    report['ica_display']=dict(figures=figures,notes=notes,
-                              diagnostics=report.get('ica_diagnostics',[]))
+    if report.get('report_requested', True):
+        with style(report.get('config',{})):
+            figures,notes=ica_figures(report,folder,model,preview)
+        report['ica_display']=dict(figures=figures,notes=notes,
+                                  diagnostics=report.get('ica_diagnostics',[]))
+    else:
+        from .quality_figures import ica_data
+        report['ica_materials']=ica_data(report,model,preview)
     # The final model records applied exclusions. Keep a separate frozen decomposition
     # so later saves cannot invalidate the pre-application checkpoint.
     frozen_model=folder/'decomposition-ica.fif'
@@ -88,10 +92,10 @@ def save_checkpoint(original,current,analysis,preview,model,config,report,direct
 
 
 def resume_ica(checkpoint,save_path,subject=None,*,selection_json=None,exclude=None,reviewer='',reason='',collect_stages=False,
-               original_raw=None,original_fif=None):
+               original_raw=None,original_fif=None,generate_report=True):
     from .configuration import resolve_config
     from .delivery import ProcessingContext,finish_processing
-    from .quality_report import safe_report
+    from .reporting import emit_report
     checkpoint=Path(checkpoint).resolve();payload=json.loads(checkpoint.read_text(encoding='utf-8-sig'))
     if payload.get('schema')!=CHECKPOINT_SCHEMA or payload.get('applied') is not False:
         raise ValueError('Unsupported or already applied ICA checkpoint; legacy v1 requires its original source version')
@@ -135,11 +139,13 @@ def resume_ica(checkpoint,save_path,subject=None,*,selection_json=None,exclude=N
     analysis=pre_ica.copy().pick(model.ch_names).load_data()
     # Reuse exact input metadata rather than introducing FIF rounding changes.
     current=original.copy().load_data()
+    from .epoch_metadata import prepare_annotations
+    prepare_annotations(current)
     if payload['report']['provenance'].get('montage_override'):
         current.set_montage(pre_ica.get_montage(),on_missing='raise',verbose=False)
     directory.mkdir(parents=True,exist_ok=True)
     report=copy.deepcopy(payload['report']);report.update(config=asdict(config),task_name=config.task_name,
-        status='running',stage_files=[],output_files=[])
+        status='running',stage_files=[],output_files=[],report_requested=generate_report)
     report['parent_run']=dict(checkpoint=str(checkpoint),checkpoint_id=payload['checkpoint_id'],
         model_sha256=payload['model_sha256'],fit_repeated=False,source_run_uuid=report['provenance']['run_uuid'],
         execution=report.pop('execution',[]),compatibility=compatibility)
@@ -176,6 +182,6 @@ def resume_ica(checkpoint,save_path,subject=None,*,selection_json=None,exclude=N
         report['provenance']['processing_finished_utc']=utc_now()
         report['outputs']={k:str(v) for k,v in paths.items()}
         completed=report['status'] in ('completed','review_required')
-        safe_report(report,paths['quality_report'],original=original if completed else None,
+        emit_report(report,paths['quality_report'],generate=generate_report,original=original if completed else None,
             clean=current if completed else None,ica=model)
     return current,report,stages

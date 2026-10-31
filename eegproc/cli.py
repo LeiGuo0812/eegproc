@@ -36,6 +36,8 @@ def parser():
     start=p.add_mutually_exclusive_group(required=True)
     start.add_argument('--input-fif');start.add_argument('--resume',help='ICA review checkpoint.json; resumes without refitting')
     p.add_argument('--save-path',required=True);p.add_argument('--subject',required=True)
+    p.add_argument('--report',action=argparse.BooleanOptionalAction,default=None,
+        help='Write HTML now (default); --no-report saves one package for later rendering')
     option(p,'preset',['standard','eeglab'])
     option(p,'ica-mode',['auto','review','manual'])
     p.add_argument('--ica-exclude',nargs='*',type=integer,default=None,help='Zero-based final list; an empty list explicitly keeps all')
@@ -88,17 +90,17 @@ def main(argv=None):
     from eegproc.api import run, resume
     p=parser();a=p.parse_args(argv)
     if a.resume:
-        allowed={'resume','save_path','subject','selection_json','ica_exclude','review_author','review_reason','settings','original_fif'}
+        allowed={'resume','save_path','subject','selection_json','ica_exclude','review_author','review_reason','settings','original_fif','report'}
         unexpected=[k for k,v in vars(a).items() if k not in allowed and v is not None]
         if unexpected or a.settings:p.error('Resume freezes the original configuration; only selection/reviewer/reason and output are accepted')
         result=resume(a.resume,a.save_path,a.subject,selection_json=a.selection_json,
             exclude=a.ica_exclude,reviewer=a.review_author or '',reason=a.review_reason or '',
-            original_fif=a.original_fif)
+            original_fif=a.original_fif,report=True if a.report is None else a.report)
         report=result.report
         print(json.dumps(dict(status=report['status'],outputs=report['outputs']),ensure_ascii=False,indent=2));return
     if a.selection_json:p.error('--selection-json requires --resume')
     if a.original_fif:p.error('--original-fif is only used with --resume')
-    io_keys={'input_fif','resume','save_path','subject','config','events_json','baseline','settings','selection_json','original_fif'}
+    io_keys={'input_fif','resume','save_path','subject','config','events_json','baseline','settings','selection_json','original_fif','report'}
     overrides={k:v for k,v in vars(a).items() if k not in io_keys and (v is not None or k in ('asr_cutoff','line_frequency'))}
     for setting in a.settings:
         try:key,value=setting.split('=',1);value=json.loads(value)
@@ -137,6 +139,7 @@ def main(argv=None):
     prep=Path(a.input_fif).with_suffix('.preparation.json')
     if prep.is_file():sources.append(str(prep))
     result=run(raw,a.save_path,a.subject,config=config,events=events,event_id=event_id,
+        report=True if a.report is None else a.report,
         invocation=dict(entrypoint='eegproc',argv=[sys.executable,*sys.argv] if argv is None else list(argv),
             cwd=str(Path.cwd()),input_paths=sources,config_path=str(Path(a.config).resolve()) if a.config else None,
             config_precedence='preset < JSON < explicit flags',explicit_overrides=overrides,effective_config=asdict(config)))

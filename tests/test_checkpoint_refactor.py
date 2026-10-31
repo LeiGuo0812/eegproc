@@ -10,12 +10,14 @@ from eegproc import compatibility
 from eegproc.checkpoint_input import input_reference,load_original,input_identity,identity_matches
 from eegproc.report_provenance import capture_signal_audit,_auxiliary_equal
 from test_pipeline import fixture
+from frozen_manifests import packaged_v031_manifest
 
 
 @pytest.fixture(autouse=True)
 def isolate_older_transition_pins(monkeypatch):
     """Each transition test controls exactly the source/target it exercises."""
     monkeypatch.setattr(compatibility, 'VERIFIED_RENAME_TARGET_SHA256', None)
+    monkeypatch.setattr(compatibility, 'VERIFIED_EPOCH_TARGET_SHA256', None)
 
 
 def test_checkpoint_contract_ignores_rendering_audit_but_rejects_algorithm_changes():
@@ -111,11 +113,7 @@ def test_previous_packaged_transition_requires_exact_source_and_target(monkeypat
 
 def test_annotation_transition_requires_exact_source_target_and_dependencies(monkeypatch):
     current=compatibility.computation_manifest()
-    prior=copy.deepcopy(current)
-    prior['source_files_sha256']['eeg_pipeline/engine.py']='bed1f8dc5c9fed88de1b2f65a68b402190592365116c753bdcee79b31ab19cd9'
-    prior['source_files_sha256']['eeg_pipeline/review.py']='3242464b8d4feed507142baf4fb88821c0b58590456b7e73d6e10bea76b26dec'
-    prior['source_files_sha256']['eeg_pipeline/raw_helpers.py']='14abf5e6fc0518d948f236eb3f628e8bbeb5cf631a538a9512a37e0843f34ecd'
-    prior['source_bundle_sha256']=compatibility._bundle(prior['source_files_sha256'])
+    prior=packaged_v031_manifest()
     assert prior['source_bundle_sha256']==compatibility.PACKAGED_V031_SOURCE_SHA256
     payload=dict(schema=compatibility.CHECKPOINT_SCHEMA,compatibility=prior)
     monkeypatch.setattr(compatibility,'VERIFIED_ANNOTATION_TARGET_SHA256',None)

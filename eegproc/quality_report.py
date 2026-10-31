@@ -47,7 +47,7 @@ def review_items(report, rows):
 
 
 def save_quality_report(report, report_path, *, original=None, clean=None, ica=None, training=None, reuse_figures=False):
-    from .quality_figures import build_signal_figures,retention_figure,style,CLASS_NAMES
+    from .quality_figures import build_signal_figures,build_material_figures,retention_figure,style,CLASS_NAMES
     from .report_provenance import capture_signal_audit,methods_text,references,data_inventory,utc_now
     started=time.perf_counter();page=Path(report_path).resolve();page.parent.mkdir(parents=True,exist_ok=True)
     if page.suffix.lower()!='.html':raise ValueError('report_path must end in .html')
@@ -59,6 +59,8 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
         except Exception as exc:report['visualizations']=dict(figures=[],notes=[],errors=[dict(section='paired_signals',message=str(exc),type=type(exc).__name__)])
         try:capture_signal_audit(report,original,clean)
         except Exception as exc:report['visualizations']['errors'].append(dict(section='metadata_audit',message=str(exc),type=type(exc).__name__))
+    elif report.get('report_materials') is not None:
+        report['visualizations']=build_material_figures(report,report['report_materials'],folder)
     viz=report.setdefault('visualizations',dict(figures=[],notes=[],errors=[]))
     rows=[]
     if reuse_figures:
@@ -87,7 +89,7 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
     adjustments=report.get('parameter_adjustments',[])
     epoch_resolution=report.get('epoch_resolution',{})
     total=ep.get('input_events',ep.get('events_total'));kept=ep.get('retained_epochs')
-    summaries=[('Subject',report.get('provenance',{}).get('subject_label',base)),('Task name',cfg.get('task_name') or 'Not specified'),('Workflow','EEG preprocessing'),('Parameter preset',cfg.get('preset','standard')),('Status',labels.get(status,status)),
+    summaries=[('Subject',report.get('provenance',{}).get('subject_label',base)),('Task name',cfg.get('task_name') or 'Not specified'),('Workflow','Standalone epoching' if report.get('epoching') else 'EEG preprocessing'),('Parameter preset',cfg.get('preset','standard')),('Status',labels.get(status,status)),
         ('Analysis',cfg.get('purpose','not recorded')),('Input duration',str(summary.get('duration_seconds','n/a'))+' s'),
         ('Sampling frequency',str(summary.get('sfreq','n/a'))+' Hz'),('EEG channels',gate.get('total_eeg_channels')),
         ('Analysis / ICA band',f"{cfg.get('highpass')}–{cfg.get('lowpass')} Hz / {cfg.get('training_highpass')}–{cfg.get('training_lowpass')} Hz"),
@@ -105,6 +107,9 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
     content=section('summary','Summary',table(summaries,classes='summary')+adjustment_body+
         (('<div class="warning"><strong>Observations</strong><ul>'+''.join('<li>'+esc(x['evidence'])+'</li>' for x in observations)+'</ul></div>') if observations else ''))
     pre='<h2>Signals before and after preprocessing</h2>'
+    if report.get('epoching'):
+        pre+='<p class="caption">'+('Preprocessing figures and diagnostics are retained from the source report.'
+            if report['epoching'].get('source_report_loaded') else 'No source preprocessing report was supplied; this report records standalone epoching.')+'</p>'
     if status=='awaiting_ica_review':pre+='<p class="caption">After: pre-ICA stage. Component subtraction is pending.</p>'
     pre+=plots('waveform_')+'<h2>Power spectral density</h2>'+plots('psd')
     line=report.get('line_diagnostics',{})
@@ -145,7 +150,7 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
         table_rows.append('<tr class="'+color+'"><td>'+str(idx)+'</td><td>'+proposal+'</td><td>'+decision+'</td>'+''.join(f'<td>{v:.4f}</td>' for v in p)+'</tr>')
     controls=''
     if selection:
-        controls='<div class="review-controls"><label>Reviewer <input type="text" id="reviewer"></label><label>Reason <input type="text" id="review-reason"></label><button class="button" id="keep-all">Keep all</button><button class="button" id="restore-proposal">Restore automatic proposal</button><button class="button primary" id="save-selection">Download confirmed selection</button></div><p class="caption">Checked components define the next exclusion list. Download selection.json and resume from the pre-ICA checkpoint. Labels and plots describe the saved result.</p><p class="caption">Checkpoint: <code>'+esc(outputs.get('checkpoint',''))+'</code></p>'
+        controls='<div class="review-controls"><label>Reviewer <input type="text" id="reviewer"></label><label>Reason <input type="text" id="review-reason"></label><button class="button" id="keep-all">Keep all</button><button class="button" id="restore-proposal">Restore automatic proposal</button><button class="button primary" id="save-selection">Download confirmed selection</button></div><p class="caption">Checked components define the next exclusion list. Download selection.json and resume from the pre-ICA checkpoint. Labels and plots describe the saved result.</p><p class="caption">Checkpoint: <code>'+esc(outputs.get('checkpoint') or report.get('preprocessing_outputs',{}).get('checkpoint',''))+'</code></p>'
     ic_body=table([('Method',cfg.get('ica_method')),('Selection rule',cfg.get('ica_rule')),('Rank / iterations',f"{ic.get('rank','n/a')} / {ic.get('iterations','n/a')}"),('Decision source',ic.get('decision_status','n/a')),('Reviewer',ic.get('review_author')),('Reason',ic.get('review_reason'))],classes='summary')
     if records:
         ic_body+='<p class="caption">Spectra: ICA training preview, dB (a.u.²/Hz). Select a topography for activation and class probabilities. <span class="excluded">Red labels: excluded components.</span></p>'+controls+'<div class="ic-grid">'+''.join(tiles)+'</div>'
@@ -160,13 +165,32 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
         epoch_body+=table([(r['name'],r['input'],r['annotation_rejected'],r['qc_rejected'],r['retained'],f"{r['retention_fraction']:.1%}" if r['retention_fraction'] is not None else 'n/a') for r in rows],['Condition','Input','Annotations','QC','Retained','Retention'])
         epoch_body+=disclosure('Epoch decisions',records_table(ep.get('records',[])))+disclosure('Epoch settings',json_block({k:v for k,v in ep.items() if k not in ('records','original_drop_log')}))
     else:epoch_body='<p>Epoching was not requested or has not been reached.</p>'
+    if report.get('epoch_annotations'):
+        epoch_body+=disclosure('BAD annotations used for epoching',records_table(report['epoch_annotations']))
     content+=section('epochs','Epochs',epoch_body)
     methods=methods_text(report)
     content+=section('methods','Methods','<div class="methods">'+''.join('<p>'+esc(p)+'</p>' for p in methods.split('\n\n') if not p.startswith('#'))+'</div>')
     content+=section('references','References','<ol class="references">'+''.join('<li><a href="'+esc(url)+'">'+esc(title)+'</a></li>' for title,url in references(report))+'</ol>')
     provenance=report.get('provenance',{});software=provenance.get('software',{})
-    about=table([('Version',report.get('workflow_revision','local')),('Run ID',provenance.get('run_uuid')),('Started (UTC)',provenance.get('started_utc')),('Finished (UTC)',provenance.get('processing_finished_utc')),('Elapsed',f"{report.get('elapsed_seconds',0):.2f} s"),('Source hash',software.get('source_bundle_sha256'))],classes='summary')
+    epoching=report.get('epoching')
+    if epoching:
+        about_rows=[('Version',report.get('workflow_revision','local')),
+            ('Epoching started (UTC)',epoching.get('started_utc')),
+            ('Epoching finished (UTC)',epoching.get('finished_utc')),
+            ('Epoching elapsed',f"{epoching.get('elapsed_seconds',report.get('elapsed_seconds',0)):.2f} s")]
+        if epoching.get('source_report_loaded'):
+            about_rows.extend([('Preprocessing started (UTC)',provenance.get('started_utc')),
+                ('Preprocessing finished (UTC)',provenance.get('processing_finished_utc'))])
+            if report.get('preprocessing_elapsed_seconds') is not None:
+                about_rows.append(('Preprocessing elapsed',f"{report['preprocessing_elapsed_seconds']:.2f} s"))
+        about=table(about_rows,classes='summary')
+    else:
+        about=table([('Version',report.get('workflow_revision','local')),('Run ID',provenance.get('run_uuid')),('Started (UTC)',provenance.get('started_utc')),('Finished (UTC)',provenance.get('processing_finished_utc')),('Elapsed',f"{report.get('elapsed_seconds',0):.2f} s"),('Source hash',software.get('source_bundle_sha256'))],classes='summary')
     about+=disclosure('Execution',records_table(report.get('execution',[])))+disclosure('Effective parameters',json_block(cfg))
+    if 'preprocessing_execution' in report:
+        about+=disclosure('Recorded preprocessing execution',records_table(report['preprocessing_execution']))
+    if 'preprocessing_parameter_adjustments' in report:
+        about+=disclosure('Recorded preprocessing parameter adjustments',records_table(report['preprocessing_parameter_adjustments']))
     about+=disclosure('Metadata checks',table(report.get('metadata_audit',{}).get('checks',{}).items(),['Field','Preserved']))
     about+=disclosure('Output inventory',records_table(report['report_audit']['data_files']))
     about+=disclosure('Software and provenance',json_block(provenance))
@@ -183,6 +207,8 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
         saved=dict(report);saved['visualizations']=dict(viz,figures=[{k:v for k,v in f.items() if k!='data_uri'} for f in viz['figures']])
         saved.pop('ica_diagnostics',None)  # Numeric previews are embedded once, in HTML.
         saved.pop('ica_display',None)  # Maps and component data are already embedded.
+        saved.pop('report_materials',None)
+        saved.pop('ica_materials',None)
         return saved
     # Machine-readable provenance stays inside the same HTML as the visible report.
     # Resolve the byte-count field before writing, so stored and returned records agree.

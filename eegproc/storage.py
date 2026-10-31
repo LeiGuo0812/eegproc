@@ -20,7 +20,7 @@ class OutputPlan:
         directory=Path(self.directory).resolve()
         targets=[directory/f'{self.subject}_cont_raw.fif', directory/f'{self.subject}-ica.fif',
                  directory/f'{self.subject}_clean-epo.fif', directory/f'{self.subject}_report.html',
-                 directory/f'{self.subject}_ica_review']
+                 directory/f'{self.subject}_ica_review',directory/f'{self.subject}_report_data.npz']
         sources={Path(p).resolve() for p in self.source_paths if p}
         if any(p in sources for p in targets):
             raise ValueError('Output path overlaps an input file; choose a separate output directory')

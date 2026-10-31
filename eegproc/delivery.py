@@ -1,5 +1,5 @@
 """Post-ICA reconstruction, continuous QC and optional epochs (also used on resume)."""
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 import mne
@@ -63,7 +63,8 @@ def finish_processing(current,raw,clean,model,*,context: ProcessingContext):
     residual |= relative_window_mask(current, config.residual_robust_z,
         config.residual_relative_min_ptp_uv,config.guard_seconds,config.window_seconds)
     if config.residual_qc:
-        add_mask_annotations(current, residual, "BAD_residual")
+        from .epoch_metadata import add_residual_annotations
+        add_residual_annotations(current, residual)
     else:
         residual[:] = False
     report['residual_qc_enabled'] = config.residual_qc
@@ -80,26 +81,16 @@ def finish_processing(current,raw,clean,model,*,context: ProcessingContext):
            for a in range(0,current.n_times,65536)):
         raise FloatingPointError("Nonfinite output")
     execution.start('save_continuous')
+    from .epoch_metadata import save_epoch_metadata
+    save_epoch_metadata(current,config,bads,paths['quality_report'],subject,epoch_config)
     store.save_final(current, paths["raw"])
     if model is not None:store.save_ica(model,paths['ica'])
     report['provenance']['continuous_finished_utc']=utc_now()
     if events is not None:
         execution.start('epochs')
-        from .epochs import repair_epochs, EpochConfig
-        from .epoch_export import make_strict_epochs
+        from .epoching import build_epochs
         selected_qc=('annotations' if config.epoch_mode=='fixed' else 'event-window') if config.epoch_qc=='auto' else config.epoch_qc
-        ec=epoch_config or EpochConfig(tmin=config.epoch_tmin,tmax=config.epoch_tmax,baseline=config.epoch_baseline,
-            peak_uv=config.residual_peak_uv,ptp_uv=config.residual_ptp_uv,robust_z=config.residual_robust_z,
-            relative_min_ptp_uv=config.residual_relative_min_ptp_uv,seed=config.seed)
-        if config.epoch_mode=='fixed':
-            ec=replace(ec,tmin=0.,tmax=config.fixed_epoch_duration-1/current.info['sfreq'],baseline=None)
-        if config.repair_epochs:
-            epochs,epoch_report=repair_epochs(current,raw,events,event_id,global_bads=bads,
-                config=ec,save_path=None,subject=subject)
-        else:
-            epochs,epoch_report=make_strict_epochs(current,raw,events,event_id,global_bads=bads,
-                config=ec,save_path=None,subject=subject,annotation_policy=selected_qc)
-        epoch_report['epoch_mode']=config.epoch_mode
+        epochs,epoch_report=build_epochs(current,config,events,event_id,epoch_config)
         epoch_path=directory/f'{subject}_clean-epo.fif'
         if len(epochs):store.save_epochs(epochs,epoch_path)
         report['epochs']=epoch_report

@@ -79,7 +79,7 @@ The default ASR implementation is shipped inside eegproc; it does not require EE
 If a wheel is attached to a release, download the matching version and install the actual filename:
 
 ```bash
-python -m pip install eegproc-0.4.0a2-py3-none-any.whl
+python -m pip install eegproc-0.4.0a3-py3-none-any.whl
 ```
 
 pip still resolves dependencies from the package index. Copying only a wheel to an offline computer is insufficient unless all required dependency wheels are also available.
@@ -93,12 +93,14 @@ python -c "import eegproc; print(eegproc.__version__); print(eegproc.__file__)"
 python -m eegproc --help
 eegproc --help
 eegproc-prepare --help
+eegproc-epoch --help
+eegproc-report --help
 python -m pip check
 ```
 
 For a regular installation, `eegproc.__file__` should be inside the active environment's `site-packages`. A source-directory import alone cannot verify installation. If the shell cannot find `eegproc`, activate the environment or use `python -m eegproc` with the environment's interpreter.
 
-Then run the [prepared-Raw example](usage.md#resting-state-recording). A successful import checks dependency availability; the first processing run also checks electrode coordinates, usable recording duration, signal rank and metadata.
+Then run the [prepared-Raw example](usage.md#resting-state-recording). A successful import checks dependency availability; the first processing run also checks electrode coordinates, usable recording duration, signal rank and metadata. The normal installation includes `epoch()`/`eegproc-epoch` and `render_report()`/`eegproc-report`; strict standalone epoching and delayed reports need no additional dependency. Local epoch repair still requires the `autoreject` extra.
 
 ## 4. Reproducible upgrades and development
 
@@ -124,8 +126,8 @@ Build isolation may download build dependencies. The source release excludes rea
 The optional clean-install validator creates its own isolated environment and installs dependencies when run by a user or CI:
 
 ```bash
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --output validation/clean-default
-python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a2-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a3-py3-none-any.whl --output validation/clean-default
+python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a3-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
 ```
 
 Choose a new output directory. `--existing-environment-check` tests the available environment without installation and explicitly does not establish clean-install support. Refer to the [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml) and actual GitHub Actions run results for completed checks.

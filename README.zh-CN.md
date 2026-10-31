@@ -57,6 +57,30 @@ erp = run(
 | 分段导出 | 按需请求 | 按需请求 |
 | 报告波形时间窗 | 4 秒 | 4 秒 |
 
+## 后续独立分段与延迟报告
+
+已完成连续预处理的 Raw 可直接调用 `epoch()`。它只执行分段和质控，不重复滤波、ASR 或 ICA，也不依赖预处理前的原始记录。
+
+```python
+from eegproc import run, epoch, render_report
+
+prep = run(task_raw, "outputs/sub01_prep", "sub01", purpose="erp",
+           task_name="oddball", report=False)
+seg = epoch(
+    prep.raw, "outputs/sub01_epochs", "sub01",
+    events=events, event_id={"standard": 1, "target": 2},
+    tmin=-0.2, tmax=1.0, baseline=(-0.2, 0.0), report=False,
+)
+render_report(seg, "outputs/sub01_epochs/sub01_report.html")
+epochs = seg.epochs
+```
+
+`run()` 和 `epoch()` 均默认 `report=True`。设为 `report=False` 时，处理过程中不绘图、不写 HTML，只保存一个 `*_report_data.npz`，供后续生成报告；不复制整份原始 Raw。`render_report()` 可接收结果对象、已有 HTML 或报告数据包。
+
+`epoch()` 从清理后 Raw/FIF 读取 BAD 来源和全局坏导信息。原有、人工及未知来源 BAD 继续参与拒绝；事件窗质控只重新检查明确标记的自动残留。程序自动查找此前的 HTML 或报告包，也可通过 `source_report="path/to/report.html"` 手动指定。报告缺失或无法读取时提醒，并生成独立分段报告。默认保留原 HTML，详见[独立分段与报告](docs/zh-CN/usage.md#独立分段)。
+
+命令行入口为 `eegproc-epoch` 和 `eegproc-report`。[epoch_and_report.py](examples/epoch_and_report.py) 提供完整的生成数据示例。
+
 ## 并行处理
 
 支持使用独立进程同时处理多份记录。`max_workers` 决定同时处理的记录数；`n_threads` 限制单份记录中受支持的数值库线程池，不会自动启动批处理任务。仓库中的 CSV 批处理示例仍按顺序运行。
@@ -169,7 +193,7 @@ outputs/sub01_rest/
     └── checkpoint.json        续处理状态
 ```
 
-请求分段且有保留试次时，另输出 `sub01_clean-epo.fif`。报告图片和表格直接嵌入 HTML。连续 BAD 注释标记问题区间，不删除采样点。
+请求分段且有保留试次时，另输出 `sub01_clean-epo.fif`。报告图片和表格直接嵌入 HTML。`report=False` 时以 `sub01_report_data.npz` 替代即时 HTML；独立 `epoch()` 只写保留的分段 FIF 和 HTML 或报告包。连续 BAD 注释标记问题区间，不删除采样点。
 
 若希望先复核再减除，设置 `ica_mode="review"`。若要修改已完成的自动结果，在报告的 IC 卡片或详情中调整 **Exclude**，下载选择文件，再用断点调用 `resume()`。新的完整列表可恢复先前删除的成分，复用原滤波、ASR 和 ICA 分解。请保留准备后的原始输入和全部断点文件，具体操作见[使用示例](docs/zh-CN/usage.md)。
 

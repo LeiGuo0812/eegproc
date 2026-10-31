@@ -75,7 +75,8 @@ def referenced(raw, selected, reference, start, stop):
     return (raw.get_data(picks=selected,start=start,stop=stop)-ref)*1e6
 
 
-def waveform_figures(original, clean, good, bads, folder):
+def waveform_data(original, clean, good, bads):
+    """Collect the existing representative windows without creating figures."""
     options=PLOT_OPTIONS.get();seconds=options.get('report_window_seconds',4.)
     limit=options.get('report_waveform_windows',3);max_channels=options.get('report_max_channels',6)
     sf=original.info['sfreq']; width=min(original.n_times,max(1,round(seconds*sf)))
@@ -103,7 +104,7 @@ def waveform_figures(original, clean, good, bads, folder):
         for i in np.unique(np.linspace(0,len(starts)-1,min(limit,len(starts)),dtype=int)):
             if len(choices)>=limit:break
             choices.setdefault(starts[i],['Additional window'])
-    figs=[]; records=[]
+    windows=[]; records=[]
     for i,(start,labels) in enumerate(choices.items()):
         before=referenced(original,good,good,start,start+width)
         after=referenced(clean,good,good,start,start+width)
@@ -119,6 +120,19 @@ def waveform_figures(original, clean, good, bads, folder):
         after=referenced(clean,selected,good,start,start+width)
         before-=np.median(before,axis=1,keepdims=True)
         after-=np.median(after,axis=1,keepdims=True)
+        windows.append(dict(start=start,width=width,sfreq=sf,seconds=seconds,labels=labels,
+            selected=selected,bads=bads,before=before,after=after,
+            input_spans=bad_spans(original),output_spans=bad_spans(clean)))
+        records.append(dict(start_sample=start,stop_sample=start+width,start_seconds=start/sf,stop_seconds=(start+width)/sf,reason=labels,channels=selected))
+    return dict(windows=windows,records=records)
+
+
+def draw_waveforms(data,folder):
+    figs=[]
+    for i,window in enumerate(data['windows']):
+        start,width,sf,seconds=(window[k] for k in ('start','width','sfreq','seconds'))
+        selected,bads,labels=(window[k] for k in ('selected','bads','labels'))
+        before,after=(np.asarray(window[k]) for k in ('before','after'))
         fig=figure(figsize=(12,1.25*len(selected)+1.0));axes=fig.subplots(len(selected),1,sharex=True,squeeze=False)[:,0]
         tt=(start+np.arange(width))/sf
         # Envelope-preserving extrema thinning for very high sample rates.
@@ -129,8 +143,8 @@ def waveform_figures(original, clean, good, bads, folder):
                 inds=np.unique(np.concatenate([[c[np.argmin(before[j,c])],c[np.argmax(before[j,c])],c[np.argmin(after[j,c])],c[np.argmax(after[j,c])]] for c in chunks]))
             ax.plot(tt[inds],before[j,inds],color=PRE,lw=.8,label='Before')
             ax.plot(tt[inds],after[j,inds],color=POST,lw=.8,label='After')
-            for raw,color in [(original,'#e3c24c'),(clean,'#dc6976')]:
-                for lo,hi,_ in bad_spans(raw):
+            for spans,color in [(window['input_spans'],'#e3c24c'),(window['output_spans'],'#dc6976')]:
+                for lo,hi,_ in spans:
                     if hi>start and lo<start+width:ax.axvspan(max(lo,start)/sf,min(hi,start+width)/sf,color=color,alpha=.10)
             ax.set_ylabel(name+('*' if name in bads else '')+'\nµV');ax.grid(alpha=.15)
             ax.spines[['top','right']].set_visible(False)
@@ -139,8 +153,11 @@ def waveform_figures(original, clean, good, bads, folder):
         fig.suptitle(title,fontsize=13)
         caption=f'Paired channels and samples; average reference over original good channels; median removed per display window. Windows selected from {seconds:g}-s blocks. Yellow: input BAD; red: output BAD; *: bad channel.'
         figs.append(asset(fig,folder,f'waveform_{i+1}',title,caption))
-        records.append(dict(start_sample=start,stop_sample=start+width,start_seconds=start/sf,stop_seconds=(start+width)/sf,reason=labels,channels=selected))
-    return figs,records
+    return figs,data['records']
+
+
+def waveform_figures(original,clean,good,bads,folder):
+    return draw_waveforms(waveform_data(original,clean,good,bads),folder)
 
 
 def paired_psd(original, clean, good, max_windows=60, window_seconds=4.):
@@ -175,6 +192,11 @@ def psd_figure(original,clean,good,report,folder):
     options=PLOT_OPTIONS.get();hp=report.get('config',{}).get('highpass',.5)
     seconds=options.get('report_psd_window_seconds') or min(20.,max(4.,2./hp))
     f,a,b,meta=paired_psd(original,clean,good,max_windows=options.get('report_psd_windows',30),window_seconds=seconds)
+    return draw_psd(dict(frequency=f,before=a,after=b,metadata=meta),report,folder)
+
+
+def draw_psd(data,report,folder):
+    f,a,b=(np.asarray(data[k]) for k in ('frequency','before','after'));meta=data['metadata']
     fig=figure(figsize=(13,5));axes=fig.subplots(1,2)
     positive=f>0; upper=min(120.,f[-1])
     for ax,xlim in zip(axes,[(max(.1,float(f[1])),upper),(1,min(45,upper))]):
@@ -240,17 +262,21 @@ def sensors_figure(original,report,folder):
 
 
 def timeline_figure(original,clean,folder):
-    sf=original.info['sfreq'];fig=figure(figsize=(13,2.8));ax=fig.subplots()
-    for row,raw,color in [(1,original,'#bd9e30'),(0,clean,BAD)]:
-        ax.broken_barh([(lo/sf,(hi-lo)/sf) for lo,hi,_ in bad_spans(raw)],(row-.18,.36),facecolors=color)
-    ax.set(yticks=[0,1],yticklabels=['Output BAD / boundaries','Input BAD / boundaries'],xlim=(0,original.n_times/sf),xlabel='Time from recording start (s)',ylim=(-.6,1.6))
+    return draw_timeline(dict(sfreq=float(original.info['sfreq']),n_times=int(original.n_times),
+        input_spans=bad_spans(original),output_spans=bad_spans(clean)),folder)
+
+
+def draw_timeline(data,folder):
+    sf=data['sfreq'];fig=figure(figsize=(13,2.8));ax=fig.subplots()
+    for row,spans,color in [(1,data['input_spans'],'#bd9e30'),(0,data['output_spans'],BAD)]:
+        ax.broken_barh([(lo/sf,(hi-lo)/sf) for lo,hi,_ in spans],(row-.18,.36),facecolors=color)
+    ax.set(yticks=[0,1],yticklabels=['Output BAD / boundaries','Input BAD / boundaries'],xlim=(0,data['n_times']/sf),xlabel='Time from recording start (s)',ylim=(-.6,1.6))
     ax.grid(axis='x',alpha=.15)
     return asset(fig,folder,'bad_timeline','Annotation timeline','Input and output BAD annotations on the original sample grid.')
 
 
-def full_record_qc(original,clean,good,bads,folder):
+def full_record_data(original,clean,good,bads):
     """EEG analogue of whole-run reportlets, not fMRI FD/DVARS or regressors."""
-    from matplotlib.colors import LogNorm
     eeg=[original.ch_names[i] for i in mne.pick_types(original.info,eeg=True,exclude=[])];sf=original.info['sfreq'];width=max(1,round(sf))
     masks=[]
     for raw in (original,clean):
@@ -271,6 +297,16 @@ def full_record_qc(original,clean,good,bads,folder):
     groups=np.array_split(np.arange(len(rows)),min(1200,len(rows)))
     displays=[np.column_stack([x[:,g].max(axis=1) for g in groups]) for x in matrices]
     edges=np.r_[[rows[g[0]]['onset_seconds'] for g in groups],original.n_times/sf]
+    return dict(displays=displays,edges=edges,rows=rows,eeg=eeg,bads=bads,
+        output_spans=bad_spans(clean),duration=original.n_times/sf,sfreq=sf,
+        sampling=dict(window_samples=width,window_count=len(rows),display_columns=len(groups),
+                      display_aggregation='max',channels=eeg,reference_channels=good))
+
+
+def draw_full_record(data,folder):
+    from matplotlib.colors import LogNorm
+    displays=[np.asarray(x) for x in data['displays']];edges=np.asarray(data['edges'])
+    rows,eeg,bads=(data[k] for k in ('rows','eeg','bads'))
     vmax=max(1.,float(max(x.max() for x in displays)));norm=LogNorm(vmin=.1,vmax=max(1.,vmax))
     fig=figure(figsize=(14,10));axes=fig.subplots(3,1,sharex=True,gridspec_kw={'height_ratios':[1.2,1.2,1]})
     ticks=np.arange(0,len(eeg),max(1,int(np.ceil(len(eeg)/32))))
@@ -282,10 +318,15 @@ def full_record_qc(original,clean,good,bads,folder):
     tt=np.array([r['onset_seconds'] for r in rows])
     for key,label,color in [('input_max_ptp_uv','Input maximum peak-to-peak',PRE),('output_max_ptp_uv','Output maximum peak-to-peak',POST)]:
         axes[2].plot(tt,np.maximum([r[key] for r in rows],.1),lw=.8,color=color,label=label)
-    for lo,hi,_ in bad_spans(clean):axes[2].axvspan(lo/sf,hi/sf,color=BAD,alpha=.12)
-    axes[2].set(yscale='log',ylabel='Peak-to-peak (uV; log scale)',xlabel='Time from recording start (s)',xlim=(0,original.n_times/sf));axes[2].legend(fontsize=9);axes[2].grid(alpha=.15)
+    sf=data['sfreq']
+    for lo,hi,_ in data['output_spans']:axes[2].axvspan(lo/sf,hi/sf,color=BAD,alpha=.12)
+    axes[2].set(yscale='log',ylabel='Peak-to-peak (uV; log scale)',xlabel='Time from recording start (s)',xlim=(0,data['duration']));axes[2].legend(fontsize=9);axes[2].grid(alpha=.15)
     caption='Non-overlapping 1-s windows with a shared log scale. Display bins use the maximum when compressed. Red: output BAD.'
-    return asset(fig,folder,'whole_record_qc','Channel-by-time peak-to-peak',caption),rows,dict(window_samples=width,window_count=len(rows),display_columns=len(groups),display_aggregation='max',channels=eeg,reference_channels=good)
+    return asset(fig,folder,'whole_record_qc','Channel-by-time peak-to-peak',caption),rows,data['sampling']
+
+
+def full_record_qc(original,clean,good,bads,folder):
+    return draw_full_record(full_record_data(original,clean,good,bads),folder)
 
 
 def ica_figures(report,folder,ica=None,training=None):
@@ -294,20 +335,46 @@ def ica_figures(report,folder,ica=None,training=None):
         display=report['ica_display']
         report['ica_diagnostics']=display['diagnostics']
         return display['figures'],display['notes']
+    return draw_ica(ica_data(report,ica,training),report,folder)
+
+
+def sensor_data(info):
+    """Only geometry used by sensor plots; no full recording or model."""
+    return dict(names=list(info['ch_names']),sfreq=float(info['sfreq']),
+        locations=np.array([c['loc'] for c in info['chs']]),
+        frames=[int(c['coord_frame']) for c in info['chs']],
+        dig=[dict(kind=int(d['kind']),ident=int(d['ident']),r=np.asarray(d['r']),
+                  coord_frame=int(d['coord_frame'])) for d in info.get('dig') or []],
+        dev_head_t=None if info.get('dev_head_t') is None else dict(
+            fro=int(info['dev_head_t']['from']),to=int(info['dev_head_t']['to']),
+            trans=np.asarray(info['dev_head_t']['trans'])))
+
+
+def sensor_info(data):
+    from mne._fiff._digitization import _format_dig_points
+    info=mne.create_info(data['names'],data['sfreq'],'eeg')
+    for channel,loc,frame in zip(info['chs'],data['locations'],data['frames']):
+        channel['loc']=np.asarray(loc).copy();channel['coord_frame']=frame
+    with info._unlock():
+        info['dig']=_format_dig_points([dict(d,r=np.asarray(d['r'])) for d in data['dig']])
+        transform=data.get('dev_head_t')
+        info['dev_head_t']=(None if transform is None else mne.transforms.Transform(
+            transform['fro'],transform['to'],np.asarray(transform['trans'])))
+    return info
+
+
+def ica_data(report,ica=None,training=None):
+    """Capture maps and bounded numeric diagnostics, without plotting."""
     ir=report.get('ica',{});p=np.asarray(ir.get('probabilities',[]),float)
-    if p.ndim!=2 or p.shape[1]!=7:return [],[]
+    if p.ndim!=2 or p.shape[1]!=7:return dict(notes=[])
     if not isinstance(ica,mne.preprocessing.ICA) or training is None:
-        return [],['ICA maps unavailable: model or training preview missing.']
+        return dict(notes=['ICA maps unavailable: model or training preview missing.'])
     origin=report.get('ica_preview',{}).get('original_start_seconds',0.)
     stop=min(training.n_times,round(60*training.info['sfreq']))
     src=ica.get_sources(training,start=0,stop=stop).get_data();maps=ica.get_components();sf=training.info['sfreq']
-    figures=[];details=[]
+    details=[]
     for idx in range(len(p)):
-        topo=maps[:,idx];topo=topo/max(np.max(np.abs(topo)),1e-30)
-        fig=figure(figsize=(2.,2.));ax=fig.subplots()
-        mne.viz.plot_topomap(topo,ica.info,axes=ax,show=False,contours=0,vlim=(-1,1),cmap='RdBu_r',sensors=False)
         key=f'ica_topomap_{idx}'
-        figures.append(asset(fig,folder,key,f'IC {idx}','Normalized component topography.'))
         n=min(src.shape[1],round(10*sf));groups=np.array_split(np.arange(n),min(400,n))
         indices=np.unique(np.concatenate([[g[np.argmin(src[idx,g])],g[np.argmax(src[idx,g])]] for g in groups]))
         ff,pp=welch(src[idx],fs=sf,nperseg=min(round(4*sf),src.shape[1]),detrend='constant')
@@ -316,8 +383,19 @@ def ica_figures(report,folder,ica=None,training=None):
             activation=np.round(src[idx,indices],6).tolist(),frequency_hz=np.round(ff[keep],5).tolist(),
             power_db=np.round(10*np.log10(np.maximum(pp[keep],1e-30)),4).tolist(),
             spectrum_duration_seconds=src.shape[1]/sf))
-    report['ica_diagnostics']=details
-    return figures,[]
+    return dict(maps=maps,geometry=sensor_data(ica.info),diagnostics=details,notes=[])
+
+
+def draw_ica(data,report,folder):
+    if 'maps' not in data:return [],data.get('notes',[])
+    maps=np.asarray(data['maps']);info=sensor_info(data['geometry']);figures=[]
+    for idx in range(maps.shape[1]):
+        topo=maps[:,idx];topo=topo/max(np.max(np.abs(topo)),1e-30)
+        fig=figure(figsize=(2.,2.));ax=fig.subplots()
+        mne.viz.plot_topomap(topo,info,axes=ax,show=False,contours=0,vlim=(-1,1),cmap='RdBu_r',sensors=False)
+        figures.append(asset(fig,folder,f'ica_topomap_{idx}',f'IC {idx}','Normalized component topography.'))
+    report['ica_diagnostics']=data['diagnostics']
+    return figures,data.get('notes',[])
 
 
 def retention_rows(report):
@@ -349,37 +427,74 @@ def retention_figure(report,folder):
     return asset(fig,folder,'epoch_retention','Epoch retention by condition','Input, annotation-rejected, QC-rejected and retained epochs by condition.'),rows
 
 
-def build_signal_figures(report,original,clean,folder,ica=None,training=None):
+def collect_report_materials(report,original,clean,ica=None,training=None):
+    """Read bounded diagnostic material now; defer every plotting operation."""
     if (original.n_times!=clean.n_times or original.first_samp!=clean.first_samp or
         original.info['sfreq']!=clean.info['sfreq'] or original.info['meas_date']!=clean.info['meas_date'] or original.ch_names!=clean.ch_names):
         raise ValueError('Input/output sample grids, clocks or channels do not match')
     eeg=[original.ch_names[i] for i in mne.pick_types(original.info,eeg=True,exclude=[])];bads=[n for n in report.get('bad_channels',[]) if n in eeg];good=[n for n in eeg if n not in bads]
     if len(good)<2:raise ValueError('At least two usable input EEG channels are required')
-    out=dict(version=1,figures=[],notes=[],errors=[],display_only=True,signal_data_modified=False)
+    out=dict(errors=[],notes=[],bads=bads)
+    with style(report.get('config',{})):
+        def collect(name,fn):
+            try:out[name]=fn()
+            except Exception as exc:out['errors'].append(dict(section=name,type=type(exc).__name__,message=str(exc)))
+        with warnings.catch_warnings(record=True) as caught:
+            collect('waveforms',lambda:waveform_data(original,clean,good,bads))
+            def psd():
+                options=PLOT_OPTIONS.get();hp=report.get('config',{}).get('highpass',.5)
+                seconds=options.get('report_psd_window_seconds') or min(20.,max(4.,2./hp))
+                f,a,b,meta=paired_psd(original,clean,good,max_windows=options.get('report_psd_windows',30),window_seconds=seconds)
+                return dict(frequency=f,before=a,after=b,metadata=meta)
+            collect('psd',psd)
+            collect('sensors',lambda:sensor_data(mne.pick_info(clean.info,mne.pick_types(clean.info,eeg=True,exclude=[]),copy=True)))
+            out['timeline']=dict(sfreq=float(original.info['sfreq']),n_times=int(original.n_times),
+                input_spans=bad_spans(original),output_spans=bad_spans(clean))
+            if report.get('config',{}).get('report_full_record_heatmap',False):
+                collect('whole_record_qc',lambda:full_record_data(original,clean,good,bads))
+            if 'ica_display' in report:
+                out['ica_display']=report['ica_display']
+            elif 'ica_materials' in report:
+                out['ica']=report['ica_materials']
+            else:
+                collect('ica',lambda:ica_data(report,ica,training))
+        out['warnings']=sorted(set(str(w.message) for w in caught))
+    return out
+
+
+def build_material_figures(report,material,folder):
+    """Plot previously collected numbers; no Raw/model reads or ICA calls."""
+    from types import SimpleNamespace
+    out=dict(version=1,figures=[],notes=list(material.get('notes',[])),errors=list(material.get('errors',[])),
+        display_only=True,signal_data_modified=False)
     with style(report.get('config',{})):
         def attempt(name,fn):
             try:return fn()
             except Exception as exc:out['errors'].append(dict(section=name,type=type(exc).__name__,message=str(exc)));return None
         with warnings.catch_warnings(record=True) as caught:
-            waves=attempt('waveforms',lambda:waveform_figures(original,clean,good,bads,folder))
+            waves=attempt('waveforms',lambda:draw_waveforms(material['waveforms'],folder)) if 'waveforms' in material else None
             if waves:out['figures']+=waves[0];out['waveform_windows']=waves[1]
-            psd=attempt('psd',lambda:psd_figure(original,clean,good,report,folder))
+            psd=attempt('psd',lambda:draw_psd(material['psd'],report,folder)) if 'psd' in material else None
             if psd:out['figures'].append(psd[0]);out['psd_sampling']=psd[1]
             line=attempt('line_noise',lambda:line_noise_figure(report,folder))
             if line:out['figures'].append(line)
             if report.get('line_diagnostics',{}).get('error'):
-                out['errors'].append(dict(section='line_noise',type=report['line_diagnostics']['error'],
-                    message=report['line_diagnostics']['reason']))
-            whole=(attempt('whole_record_qc',lambda:full_record_qc(original,clean,good,bads,folder))
-                   if report.get('config',{}).get('report_full_record_heatmap',False) else None)
-            if whole:
-                out['figures'].append(whole[0]);report['qc_timeseries']=whole[1];out['whole_record_sampling']=whole[2]
+                out['errors'].append(dict(section='line_noise',type=report['line_diagnostics']['error'],message=report['line_diagnostics']['reason']))
+            whole=attempt('whole_record_qc',lambda:draw_full_record(material['whole_record_qc'],folder)) if 'whole_record_qc' in material else None
+            if whole:out['figures'].append(whole[0]);report['qc_timeseries']=whole[1];out['whole_record_sampling']=whole[2]
             out['whole_record_heatmap_requested']=bool(report.get('config',{}).get('report_full_record_heatmap',False))
-            # The output also has an explicitly supplied montage if input lacked one.
-            for name,fn in [('bad_channels',lambda:sensors_figure(clean,report,folder)),('bad_timeline',lambda:timeline_figure(original,clean,folder))]:
-                f=attempt(name,fn)
-                if f:out['figures'].append(f)
-            ic=attempt('ica',lambda:ica_figures(report,folder,ica,training))
+            sensors=attempt('bad_channels',lambda:sensors_figure(SimpleNamespace(info=sensor_info(material['sensors'])),report,folder)) if 'sensors' in material else None
+            if sensors:out['figures'].append(sensors)
+            timeline=attempt('bad_timeline',lambda:draw_timeline(material['timeline'],folder)) if 'timeline' in material else None
+            if timeline:out['figures'].append(timeline)
+            if 'ica_display' in material:
+                display=material['ica_display'];report['ica_diagnostics']=display['diagnostics'];ic=(display['figures'],display['notes'])
+            else:
+                ic=attempt('ica',lambda:draw_ica(material.get('ica',{}),report,folder))
             if ic:out['figures']+=ic[0];out['notes']+=ic[1]
-        out['plot_warnings']=sorted(set(str(w.message) for w in caught))
+        out['plot_warnings']=sorted(set(material.get('warnings',[])+[str(w.message) for w in caught]))
     return out
+
+
+def build_signal_figures(report,original,clean,folder,ica=None,training=None):
+    return build_material_figures(report,collect_report_materials(report,original,clean,ica,training),folder)

@@ -97,6 +97,8 @@ def _restore_images(report, images, details):
 def _check_record(report):
     if not isinstance(report, dict) or not isinstance(report.get('status'), str) or not isinstance(report.get('config'), dict):
         raise ValueError('Source has no usable machine-readable run record')
+    if report.get('report_materials') is not None:
+        return
     figures = report.get('visualizations', {}).get('figures', [])
     if not figures:
         raise ValueError('Source has no usable embedded images; waveform redraw requires the original data')
@@ -116,11 +118,64 @@ def _check_record(report):
         raise ValueError('Source does not contain complete ICA component diagnostics')
 
 
+def read_report_source(source):
+    """Read a result, HTML or report-data archive without reading EEG files."""
+    from .api import PipelineResult
+    if isinstance(source, PipelineResult):
+        report = deepcopy(source.report)
+        outputs = report.get('outputs', {})
+        path = outputs.get('report_data') or outputs.get('quality_report')
+        figures = report.get('visualizations', {}).get('figures', [])
+        missing = any(not figure.get('data_uri') for figure in figures)
+        if path and (missing or (report.get('report_status') == 'deferred' and 'report_materials' not in report)):
+            return read_report_source(path)
+        return report
+    if not isinstance(source, (str, PathLike)):
+        raise TypeError('source must be a result, HTML report or report-data archive')
+    path = Path(source)
+    if path.suffix.lower() == '.npz':
+        from .report_data import read_report_data
+        return read_report_data(path)
+    return _read_html(path)
+
+
+def emit_report(record, path, *, generate=True, original=None, clean=None, ica=None, training=None):
+    """Write HTML now, or collect numeric display material for later plotting."""
+    from .quality_report import safe_report
+    target = Path(path).resolve()
+    if generate:
+        record.setdefault('outputs', {}).pop('expected_report', None)
+        return safe_report(record, target, original=original, clean=clean, ica=ica, training=training)
+    outputs = record.setdefault('outputs', {})
+    outputs.pop('quality_report', None)
+    outputs['expected_report'] = str(target)
+    bundle = target.with_name(target.stem + '_data.npz')
+    record['processing_status'] = record.get('status', 'unknown')
+    record['delivery_status'] = ('completed' if record.get('status') in
+        ('completed', 'review_required', 'awaiting_ica_review') else 'incomplete')
+    record['report_status'] = 'deferred'
+    try:
+        if original is not None and clean is not None:
+            from .quality_figures import collect_report_materials
+            from .report_provenance import capture_signal_audit
+            record['report_materials'] = collect_report_materials(record, original, clean, ica, training)
+            capture_signal_audit(record, original, clean)
+        outputs['report_data'] = str(bundle)
+        from .report_data import save_report_data
+        save_report_data(record, bundle)
+        return True
+    except Exception as exc:
+        outputs.pop('report_data', None)
+        record['report_status'] = 'failed'
+        record['report_error'] = dict(type=type(exc).__name__, message=str(exc))
+        return False
+
+
 def render_report(source, report_path: str | PathLike[str]) -> Path:
     """Render current HTML layout from a PipelineResult or a previous HTML.
 
-    Existing plots and component numeric diagnostics are reused exactly. This
-    function never loads Raw/FIF or reruns filters, ASR, ICA, epoching or plotting.
+    Existing HTML plots are reused exactly. Deferred numeric material is plotted
+    without loading Raw/FIF or rerunning filters, ASR, ICA or epoching.
     The target must be a new HTML file; source results and their provenance are
     unchanged. Waveform windows and other plot settings cannot be changed here.
     """
@@ -136,21 +191,18 @@ def render_report(source, report_path: str | PathLike[str]) -> Path:
         raise FileExistsError('Report target already exists; choose a new HTML path')
     source_path = None
     if isinstance(source, PipelineResult):
-        report = deepcopy(source.report)
-        path = report.get('outputs', {}).get('quality_report')
+        path = source.report.get('outputs', {}).get('report_data') or source.report.get('outputs', {}).get('quality_report')
         if path and Path(path).is_file():
             source_path = Path(path).resolve()
-        figures = report.get('visualizations', {}).get('figures', [])
-        if any(not figure.get('data_uri') for figure in figures) and source_path:
-            cached = _read_html(source_path)
-            report['visualizations'] = cached['visualizations']
-            report['ica_diagnostics'] = cached.get('ica_diagnostics', [])
+        report = read_report_source(source)
     elif isinstance(source, (str, PathLike)):
         source_path = Path(source).resolve()
-        report = _read_html(source_path)
+        report = read_report_source(source_path)
     else:
-        raise TypeError('source must be a PipelineResult or an existing standalone HTML report')
-    _check_record(report)
+        raise TypeError('source must be a PipelineResult, HTML report or report-data archive')
+    deferred = report.get('report_status') == 'deferred' or 'report_materials' in report
+    if not deferred:
+        _check_record(report)
     if source_path == target:
         raise ValueError('The report source must remain unchanged; choose another HTML path')
     prior = deepcopy(report.get('report_generation'))
@@ -158,14 +210,27 @@ def render_report(source, report_path: str | PathLike[str]) -> Path:
         schema='eeg-report-render-v1', generated_utc=utc_now(), renderer_version=__version__,
         source_report=str(source_path) if source_path else None,
         source_report_sha256=file_hash(source_path) if source_path else None,
-        reused_embedded_figures=True, reused_component_diagnostics=True,
-        signal_processing_repeated=False, waveform_redrawn=False,
+        reused_embedded_figures=not deferred, reused_component_diagnostics=True,
+        signal_processing_repeated=False, waveform_redrawn=bool(report.get('report_materials')),
         renderer_sha256={name:file_hash(Path(__file__).with_name(name))
                          for name in ('reporting.py','quality_report.py','report_layout.py')},
     )
     if prior:
         report['report_generation']['previous_generation'] = prior
-    if not safe_report(report,target,reuse_figures=True):
+    report.setdefault('outputs', {}).pop('expected_report', None)
+    if not safe_report(report,target,reuse_figures=not deferred):
         error = report.get('report_error', {}).get('message', 'unknown rendering error')
         raise RuntimeError('Report rendering failed: '+error)
+    epoching = report.get('epoching', {})
+    previous = epoching.get('source_report')
+    if (previous and epoching.get('keep_source_report', True) is False
+            and report.get('status') in ('completed', 'review_required')):
+        old = Path(previous).resolve()
+        if old.suffix.lower() == '.html' and old != target and old.is_file():
+            try:
+                old.unlink()
+            except OSError as exc:
+                import warnings
+                warnings.warn(f'The new report was saved but the original HTML could not be removed: {exc}',
+                              RuntimeWarning, stacklevel=2)
     return target

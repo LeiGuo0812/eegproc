@@ -147,7 +147,7 @@ Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the p
 
 ## Advanced epoch parameters
 
-Pass a mapping or EpochConfig through run's epoch_config. A complete object overrides all stage defaults; a mapping overrides supplied fields only. Continuous QC is unchanged. Fixed windows force tmin=0, tmax=duration−1/sfreq, baseline=None. Repair budget/CV require repair_epochs=True; repair is off by default. The table shows standalone class defaults; inherited pipeline values are described separately.
+Pass a mapping or EpochConfig through run's or epoch's epoch_config. A complete object overrides all stage defaults; a mapping overrides supplied fields only. Continuous QC is unchanged. Fixed windows force tmin=0, tmax=duration−1/sfreq, baseline=None. Repair budget/CV require repair_epochs=True; repair is off by default. The table shows standalone class defaults; inherited pipeline values are described separately.
 
 | Parameter | Type | Values / units | Meaning | Class default |
 |---|---|---|---|---|
@@ -165,11 +165,15 @@ Pass a mapping or EpochConfig through run's epoch_config. A complete object over
 | `seed` | int | int; 0 ≤ seed < 2**32 | Inherited from pipeline seed. | `20261018` |
 
 ```text
-run(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str', *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, montage: 'Any' = None, collect_stages: 'bool' = False, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, invocation: 'Mapping[str, Any] | None' = None, **parameters: 'Any') -> 'PipelineResult'
+run(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str', *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, montage: 'Any' = None, collect_stages: 'bool' = False, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, invocation: 'Mapping[str, Any] | None' = None, report: 'bool' = True, **parameters: 'Any') -> 'PipelineResult'
 ```
 
 ```text
-resume(checkpoint: 'str | PathLike[str]', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, selection_json: 'str | PathLike[str] | None' = None, exclude: 'Sequence[int] | None' = None, reviewer: 'str' = '', reason: 'str' = '', collect_stages: 'bool' = False, original_raw: 'mne.io.BaseRaw | None' = None, original_fif: 'str | PathLike[str] | None' = None) -> 'PipelineResult'
+epoch(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, source_report: 'str | PathLike[str] | None' = None, keep_source_report: 'bool' = True, report: 'bool' = True, **parameters: 'Any') -> 'PipelineResult'
+```
+
+```text
+resume(checkpoint: 'str | PathLike[str]', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, selection_json: 'str | PathLike[str] | None' = None, exclude: 'Sequence[int] | None' = None, reviewer: 'str' = '', reason: 'str' = '', collect_stages: 'bool' = False, original_raw: 'mne.io.BaseRaw | None' = None, original_fif: 'str | PathLike[str] | None' = None, report: 'bool' = True) -> 'PipelineResult'
 ```
 
 ```text
@@ -190,11 +194,16 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 | Interface | Inputs and returned objects |
 |---|---|
 | run | raw: continuous MNE BaseRaw; EEG/EOG/ECG in volts; input unchanged. save_path: output directory; subject: safe filename prefix. config/config_file: sources above. montage: explicit geometry override on the working copy; omit it to preserve existing digitization. collect_stages=False avoids extra stage copies. events: integer n×3, first column absolute MNE samples including first_samp. event_id: condition name → integer. epoch_config: stage overrides. invocation: provenance mapping. Additional keywords: all PipelineConfig fields. |
-| PipelineResult | raw: cleaned Raw, or None while awaiting ICA review; report: diagnostics dictionary; stages: requested in-memory snapshots; status: run status; outputs: actual product paths. review_required means assess flagged quality before downstream analysis. |
+| epoch | raw: already preprocessed continuous MNE Raw; no original input needed and no continuous preprocessing repeated. save_path: new output directory; subject: optional filename prefix. events/event_id follow run's MNE sample convention. tmin/tmax/baseline alias epoch_tmin/epoch_tmax/epoch_baseline. config/config_file, epoch_config and related QC controls remain available. source_report=None discovers the previous HTML/package, a path selects one explicitly. keep_source_report=True retains source HTML. report defaults True; False defers figures/HTML. |
+| PipelineResult | raw: continuous result or None when unavailable; epochs: epoch result or None, loaded on demand for integrated runs; report: diagnostics dictionary; stages: requested in-memory snapshots; status: processing status; outputs: actual product paths. review_required means assess flagged quality before downstream analysis. |
 | resume | checkpoint: checkpoint.json; save_path: new output family; subject: optional prefix. Either selection_json or exclude: a complete zero-based list, [] keeps all. reviewer/reason record the decision. original_raw or original_fif supplies matching original data; required explicitly for an in-memory origin or moved source. collect_stages defaults False. Reuses ICA/ICLabel; no change of scientific parameters. |
-| render_report | source: PipelineResult or saved HTML; report_path: fresh HTML path. Rebuilds layout using embedded diagnostics, without reprocessing EEG. |
+| render_report | source: PipelineResult, saved HTML or report-data NPZ; report_path: fresh HTML path. Reuses saved figures or draws collected diagnostics without repeating preprocessing or epoch QC. Returns the HTML path. |
 | resolve_config | path: optional JSON path, mapping or PipelineConfig; keyword overrides have highest priority. Returns an immutable PipelineConfig; no configuration file is discovered implicitly. |
 | prepare_data | source: supported file or Neuracle directory; output_fif=None returns data only, a path also writes FIF/.events.json/.preparation.json. channel_types and rename are mappings; drop is a channel-name sequence; montage is actual electrode geometry; event_id maps annotation descriptions to integer codes. allow_legacy_uv_per_mm=False applies only to confirmed legacy Neuracle calibration. return_result=False returns Raw; True returns PreparationResult(raw, events, event_id, provenance, outputs). No filtering, referencing or cleaning is performed. |
+
+## Reporting controls
+
+These are runtime arguments, not additional PipelineConfig fields. run and epoch default to report=True. report=False collects bounded diagnostic material and writes one *_report_data.npz, without drawing or HTML; immediate mode writes HTML without an extra package. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a new combined HTML succeeds, never during deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
 
 ## Complete CLI flags
 
@@ -207,6 +216,7 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 | `--resume` | `resume` | False |
 | `--save-path` | `save_path` | True |
 | `--subject` | `subject` | True |
+| `--report` / `--no-report` | `report` | False |
 | `--preset` | `preset` | False |
 | `--ica-mode` | `ica_mode` | False |
 | `--ica-exclude` | `ica_exclude` | False |
@@ -268,7 +278,51 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/sub01 --subject sub01 --purpose erp --task-name oddball --epochs --set report_window_seconds=4.0
 eegproc --input-fif prepared/sub02_raw.fif --save-path outputs/sub02 --subject sub02 --purpose rest --asr-cutoff off --set ica_enabled=false
 eegproc --resume outputs/review/sub01_ica_review/checkpoint.json --save-path outputs/revised --subject sub01 --ica-exclude 1 4 --original-fif prepared/sub01_raw.fif
+eegproc --input-fif prepared/sub03_raw.fif --save-path outputs/sub03 --subject sub03 --no-report
+eegproc-epoch --input-fif outputs/sub03/sub03_cont_raw.fif --save-path outputs/sub03_epochs --subject sub03 --events-json prepared/sub03.events.json --tmin -0.2 --tmax 1.0 --no-report
+eegproc-report --source outputs/sub03_epochs/sub03_report_data.npz --output outputs/sub03_epochs/sub03_report.html
 ```
+
+### `eegproc-epoch`
+
+| Flags | Destination | Required |
+|---|---|---|
+| `-h` / `--help` | `help` | False |
+| `--input-fif` | `input_fif` | True |
+| `--save-path` | `save_path` | True |
+| `--subject` | `subject` | False |
+| `--config` | `config` | False |
+| `--task-name` | `task_name` | False |
+| `--events-json` | `events_json` | False |
+| `--epoch-mode` | `epoch_mode` | False |
+| `--event-source` | `event_source` | False |
+| `--event-names` | `event_names` | False |
+| `--stim-channel` | `stim_channel` | False |
+| `--tmin` | `tmin` | False |
+| `--tmax` | `tmax` | False |
+| `--baseline` | `baseline` | False |
+| `--fixed-epochs` | `fixed_epoch_duration` | False |
+| `--fixed-overlap` | `fixed_epoch_overlap` | False |
+| `--epoch-qc` | `epoch_qc` | False |
+| `--repair-epochs` / `--no-repair-epochs` | `repair_epochs` | False |
+| `--residual-peak-uv` | `residual_peak_uv` | False |
+| `--residual-ptp-uv` | `residual_ptp_uv` | False |
+| `--residual-robust-z` | `residual_robust_z` | False |
+| `--residual-relative-min-ptp-uv` | `residual_relative_min_ptp_uv` | False |
+| `--seed` | `seed` | False |
+| `--n-threads` | `n_threads` | False |
+| `--source-report` | `source_report` | False |
+| `--keep-source-report` / `--no-keep-source-report` | `keep_source_report` | False |
+| `--report` / `--no-report` | `report` | False |
+| `--set` | `settings` | False |
+
+### `eegproc-report`
+
+| Flags | Destination | Required |
+|---|---|---|
+| `-h` / `--help` | `help` | False |
+| `--source` | `source` | True |
+| `--output` | `output` | True |
 
 ### Preparation command
 

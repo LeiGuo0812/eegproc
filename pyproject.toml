@@ -46,6 +46,8 @@ dev = [
 [project.scripts]
 eegproc = "eegproc.cli:main"
 eegproc-prepare = "eegproc.prepare_cli:main"
+eegproc-epoch = "eegproc.epoch_cli:main"
+eegproc-report = "eegproc.report_cli:main"
 
 [project.urls]
 Repository = "https://github.com/LeiGuo0812/eegproc"

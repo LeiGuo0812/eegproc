@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from os import PathLike
 from pathlib import Path
 from typing import Any, TYPE_CHECKING
@@ -22,6 +22,15 @@ class PipelineResult:
     raw: mne.io.BaseRaw | None
     report: dict
     stages: dict
+    _epochs: Any = field(default=None, repr=False, compare=False)
+
+    @property
+    def epochs(self):
+        """Return epochs, reading saved data lazily when produced by run/resume."""
+        if self._epochs is None and self.outputs.get('epochs'):
+            import mne
+            self._epochs = mne.read_epochs(self.outputs['epochs'], preload=False, verbose=False)
+        return self._epochs
 
     @property
     def status(self):return self.report['status']
@@ -43,6 +52,7 @@ def run(
     event_id: Mapping[str, int] | None = None,
     epoch_config: EpochConfig | None = None,
     invocation: Mapping[str, Any] | None = None,
+    report: bool = True,
     **parameters: Any,
 ) -> PipelineResult:
     """Process a continuous MNE Raw without mutating its input.
@@ -56,6 +66,10 @@ def run(
 
     from .parameter_resolution import adjustment, append_adjustments, audit_value
     adjustments = []
+    if not isinstance(report, bool):
+        adjustments.append(adjustment('report', report, True,
+            'Expected a boolean; immediate HTML reporting used'))
+        report = True
     if not isinstance(collect_stages, bool):
         adjustments.append(adjustment('collect_stages', collect_stages, False,
             'Expected a boolean; optional in-memory stage collection disabled'))
@@ -83,10 +97,40 @@ def run(
         except (TypeError, ValueError, OSError):
             config_path = audit_value(config_file)
         evidence.setdefault('config_path', config_path)
-    current,report,stages=preprocess_raw(raw,save_path,subject,config=effective,
+    current,record,stages=preprocess_raw(raw,save_path,subject,config=effective,
         montage=montage,collect_stages=collect_stages,events=events,event_id=event_id,
-        epoch_config=epoch_config,invocation=evidence)
-    return PipelineResult(None if report['status']=='awaiting_ica_review' else current,report,stages)
+        epoch_config=epoch_config,invocation=evidence,generate_report=report)
+    return PipelineResult(None if record['status']=='awaiting_ica_review' else current,record,stages)
+
+
+def epoch(
+    raw: mne.io.BaseRaw,
+    save_path: str | PathLike[str],
+    subject: str | None = None,
+    *,
+    config: ConfigInput = None,
+    config_file: str | PathLike[str] | None = None,
+    events: np.ndarray | Sequence[Sequence[int]] | None = None,
+    event_id: Mapping[str, int] | None = None,
+    epoch_config: EpochConfig | None = None,
+    source_report: str | PathLike[str] | None = None,
+    keep_source_report: bool = True,
+    report: bool = True,
+    **parameters: Any,
+) -> PipelineResult:
+    """Epoch an already processed Raw, without running continuous cleaning.
+
+    Common parameters are ``tmin``, ``tmax`` and ``baseline``. Existing
+    ``epoch_*`` names and scientific QC controls remain supported. Source
+    reports are discovered automatically unless an explicit path is supplied.
+    ``report=False`` retains one compact report-data package for later use.
+    """
+    from .epoching import epoch_raw
+    epochs, record = epoch_raw(raw, save_path, subject, config=config,
+        config_file=config_file, events=events, event_id=event_id,
+        epoch_config=epoch_config, source_report=source_report,
+        keep_source_report=keep_source_report, report=report, **parameters)
+    return PipelineResult(None, record, {}, epochs)
 
 
 def resume(
@@ -101,13 +145,14 @@ def resume(
     collect_stages: bool = False,
     original_raw: mne.io.BaseRaw | None = None,
     original_fif: str | PathLike[str] | None = None,
+    report: bool = True,
 ) -> PipelineResult:
     """Apply a complete IC exclusion list without repeating decomposition."""
     from .review import resume_ica
-    raw,report,stages=resume_ica(checkpoint,save_path,subject,selection_json=selection_json,
+    raw,record,stages=resume_ica(checkpoint,save_path,subject,selection_json=selection_json,
         exclude=exclude,reviewer=reviewer,reason=reason,collect_stages=collect_stages,
-        original_raw=original_raw,original_fif=original_fif)
-    return PipelineResult(raw,report,stages)
+        original_raw=original_raw,original_fif=original_fif,generate_report=report)
+    return PipelineResult(raw,record,stages)
 
 
 def render_report(source: PipelineResult | str | PathLike[str], report_path: str | PathLike[str]) -> Path:

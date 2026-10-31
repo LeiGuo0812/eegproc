@@ -81,7 +81,8 @@ def capture_provenance(raw,subject,invocation=None,montage=None):
 
 def _ann_key(a):
     return (round(float(a['onset']),8),round(float(a['duration']),8),str(a['description']),
-            tuple(a.get('ch_names',())),json.dumps(dict(a.get('extras',{})),sort_keys=True))
+            tuple(a.get('ch_names',())),json.dumps({k:v for k,v in a.get('extras',{}).items()
+                if k!='eegproc_origin'},sort_keys=True))
 
 
 def _auxiliary_equal(original,clean,picks,block_samples=65536):
@@ -163,6 +164,10 @@ def write_table(path,rows,columns,descriptions):
 def references(report):
     c=report.get('config',{});refs=[
         ('Gramfort A, et al. (2013). MEG and EEG data analysis with MNE-Python. Frontiers in Neuroscience, 7, 267.', 'https://doi.org/10.3389/fnins.2013.00267')]
+    if report.get('epoching') and not report['epoching'].get('source_report_loaded'):
+        if report.get('epochs',{}).get('enabled'):
+            refs.append(('Jas M, et al. (2017). Autoreject: Automated artifact rejection for MEG and EEG data. NeuroImage, 159, 417–429.','https://autoreject.github.io/stable/index.html'))
+        return refs
     if c.get('channel_method','pyprep')=='pyprep':refs.append(('Bigdely-Shamlo N, et al. (2015). The PREP pipeline: standardized preprocessing for large-scale EEG analysis. Frontiers in Neuroinformatics, 9, 16.','https://doi.org/10.3389/fninf.2015.00016'))
     if c.get('channel_method')=='eegprep' or c.get('filter_method')=='eeglab_fir':refs.append(('EEGPrep. Python implementations of EEGLAB preprocessing methods.','https://eegprep.org/'))
     if report.get('ica'):
@@ -176,6 +181,16 @@ def references(report):
 
 def methods_text(report):
     c=report.get('config',{});ic=report.get('ica',{});ep=report.get('epochs',{})
+    if report.get('epoching'):
+        text=['# Methods', 'Standalone epoching used the supplied preprocessed MNE Raw. Continuous filtering, ASR and ICA were not repeated.']
+        if ep:
+            ec=ep.get('config',{})
+            text.append(f"Epoch window: {ec.get('tmin')} to {ec.get('tmax')} s; baseline: {ec.get('baseline')}. QC: {ep.get('annotation_policy',ep.get('method'))}. Retained: {ep.get('retained_epochs')} / {ep.get('input_events')} epochs; locally repaired: {ep.get('repaired_epochs',0)}.")
+        previous=report.get('preprocessing_methods')
+        if previous:
+            text.append('Recorded preprocessing methods:')
+            text.extend(paragraph for paragraph in previous.split('\n\n') if not paragraph.startswith('#'))
+        return '\n\n'.join(text)+'\n'
     text=['# Methods',f"EEG preprocessing used eegproc ({report.get('workflow_revision','local')}) with the {c.get('preset','standard')} parameter preset. Random seed: {c.get('seed','not recorded')}; threads: {c.get('n_threads','not recorded')}."]
     if report.get('status') not in ('completed','review_required'):text.append('Processing is incomplete; the following describes the available stages.')
     if report.get('line_cleaning'):
@@ -200,7 +215,7 @@ def methods_text(report):
 
 def data_inventory(report,root):
     rows=[];outputs=report.get('outputs',{});checkpoint=report.get('ica_checkpoint',{})
-    reused=checkpoint.get('reused',False);root=Path(root).resolve();seen=set()
+    reused=checkpoint.get('reused',False) or bool(report.get('epoching'));root=Path(root).resolve();seen=set()
     receipts={Path(r['path']).resolve():r for r in report.get('output_files',[])
               if r.get('status')=='committed'}
     def display_path(p):
@@ -224,6 +239,14 @@ def data_inventory(report,root):
         seen.add(p)
         rows.append(dict(kind='review_state',path=display_path(p),exists=p.is_file(),produced_this_run=not reused,reused=reused,
             bytes=p.stat().st_size if p.is_file() else None,sha256=item['sha256']))
+    for kind in ('raw','ica','checkpoint','pre_ica','decomposition'):
+        name=report.get('preprocessing_outputs',{}).get(kind)
+        if not name:continue
+        p=Path(name).resolve()
+        if p in seen:continue
+        seen.add(p)
+        rows.append(dict(kind=kind,path=display_path(p),exists=p.is_file(),produced_this_run=False,
+                         reused=True,bytes=p.stat().st_size if p.is_file() else None,sha256=None))
     for p,receipt in receipts.items():
         if p in seen:continue
         seen.add(p)

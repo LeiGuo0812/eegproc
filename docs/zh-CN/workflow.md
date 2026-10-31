@@ -278,6 +278,42 @@ flowchart TB
 
 续处理复用原滤波、ASR、ICA 拟合和 ICLabel 结果，并复用父断点，不再复制一份完整断点。仅在 HTML 修改勾选不会改写 FIF；原报告红字和波形仍描述保存时的结果，需创建新一轮结果后才更新。
 
+## 独立分段
+
+```mermaid
+flowchart TB
+    accTitle: 独立分段与质控
+    accDescr: 读取清理后 Raw 及内嵌 BAD 来源，建立请求的分段并保存保留试次，不重复连续预处理。
+    cleaned_raw["清理后的 MNE Raw"] --> bad_origins["读取 BAD 来源"]
+    bad_origins --> resolve_events["解析分段请求"]
+    resolve_events --> construct_epochs["建立分段"]
+    construct_epochs --> epoch_qc["执行分段质控"]
+    epoch_qc --> save_epochs["保存保留试次"]
+    save_epochs --> report_output["输出分段报告"]
+    source_report["此前 HTML 或报告包"] -.-> report_output
+```
+
+`epoch()` 与阶段 7 使用同一分段内核，不重复去工频、坏导检测、滤波、ASR 或 ICA。清理后 Raw/FIF 携带全局坏导名单、相关分段默认值和最少的自动残留来源信息。原有、人工及未知来源 BAD 继续保留。传入 Raw 保持不变，基线校正及可选有限修复只影响 Epochs。
+
+原报告为可选输入，只提供展示素材，不决定 BAD 处理，也不作为分段数据来源。查找顺序为手动指定、同目录 HTML／报告包、Raw 的报告路径提示。缺失或无法读取时提醒并生成独立分段报告。请自行选择对应来源，程序不增加记录身份匹配。新的合并 HTML 默认保留原报告。
+
+## 即时或延迟报告交付
+
+```mermaid
+flowchart TB
+    accTitle: 即时与延迟报告交付
+    accDescr: 采集有限诊断素材后，立即绘制 HTML 或保存一个数据包以便后续生成。
+    collect_data["采集诊断数据"] --> report_enabled{"report=True？"}
+    report_enabled -->|是| draw_now["绘制报告图表"]
+    draw_now --> html_now["写入 HTML"]
+    report_enabled -->|否| package["保存报告数据包"]
+    package --> render_later["调用 render_report"]
+    render_later --> draw_later["绘制已存诊断素材"]
+    draw_later --> html_later["后续写入 HTML"]
+```
+
+`run()` 和 `epoch()` 均默认即时生成 HTML。`report=False` 时仅保存一个 `*_report_data.npz`，运行中不绘图、不写 HTML；保留代表性处理前后窗口、频谱摘要、ICA 诊断和 QC 记录，不复制整份原始 Raw。报告生成不重跑去噪或分段质控；已有 HTML 也可复用内嵌图片重新生成。科学默认参数和四秒波形显示时间窗不变。
+
 ## 输入与交付文件
 
 ### 结果文件
@@ -316,4 +352,4 @@ flowchart TB
 
 `pre_ica_raw.fif` 保存 IC 减除前的分析频段信号。`decomposition-ica.fif` 是冻结模型；`checkpoint.json` 记录续处理设置、身份校验及报告数据。
 
-正常完成且启用 ICA 时通常为**六个文件**：三个结果文件加三个断点文件。保留 epochs 时再加一个。只运行 review 时输出 HTML 和断点；关闭 ICA 时没有模型及断点。大 FIF 可能拆成编号分卷。不生成 `original_raw.fif`、`preview_raw.fif`、逐阶段快照或报告图片/表格附件。`selection.json` 由复核者在需要时手动下载。
+正常完成且启用 ICA 时通常为**六个文件**：三个结果文件加三个断点文件。保留 epochs 时再加一个；`report=False` 时以报告包替代即时 HTML。只运行 review 时输出 HTML 或延迟报告包和断点；关闭 ICA 时没有模型及断点。独立分段只写保留试次 FIF 和一个 HTML 或报告包，不复制连续数据或 ICA。大 FIF 可能拆成编号分卷。不生成 `original_raw.fif`、`preview_raw.fif`、逐阶段快照或报告图片/表格附件。`selection.json` 由复核者在需要时手动下载。

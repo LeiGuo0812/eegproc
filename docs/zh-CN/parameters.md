@@ -147,7 +147,7 @@ purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续�
 
 ## 高级分段参数
 
-通过 run 的 epoch_config 传字典或 EpochConfig。完整对象覆盖所有分段默认值，字典仅覆盖给定字段，不修改连续 QC。固定窗强制 tmin=0、tmax=duration−1/sfreq、baseline=None。修复预算/CV 仅 repair_epochs=True 时启用，默认关闭局部修复。下表为独立类默认值；流程继承关系见说明列。
+通过 run 或 epoch 的 epoch_config 传字典或 EpochConfig。完整对象覆盖所有分段默认值，字典仅覆盖给定字段，不修改连续 QC。固定窗强制 tmin=0、tmax=duration−1/sfreq、baseline=None。修复预算/CV 仅 repair_epochs=True 时启用，默认关闭局部修复。下表为独立类默认值；流程继承关系见说明列。
 
 | 参数 | 类型 | 有效值 / 单位 | 说明 | 类默认值 |
 |---|---|---|---|---|
@@ -165,11 +165,15 @@ purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续�
 | `seed` | int | int; 0 ≤ seed < 2**32 | 默认继承流程 seed。 | `20261018` |
 
 ```text
-run(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str', *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, montage: 'Any' = None, collect_stages: 'bool' = False, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, invocation: 'Mapping[str, Any] | None' = None, **parameters: 'Any') -> 'PipelineResult'
+run(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str', *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, montage: 'Any' = None, collect_stages: 'bool' = False, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, invocation: 'Mapping[str, Any] | None' = None, report: 'bool' = True, **parameters: 'Any') -> 'PipelineResult'
 ```
 
 ```text
-resume(checkpoint: 'str | PathLike[str]', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, selection_json: 'str | PathLike[str] | None' = None, exclude: 'Sequence[int] | None' = None, reviewer: 'str' = '', reason: 'str' = '', collect_stages: 'bool' = False, original_raw: 'mne.io.BaseRaw | None' = None, original_fif: 'str | PathLike[str] | None' = None) -> 'PipelineResult'
+epoch(raw: 'mne.io.BaseRaw', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, config: 'ConfigInput' = None, config_file: 'str | PathLike[str] | None' = None, events: 'np.ndarray | Sequence[Sequence[int]] | None' = None, event_id: 'Mapping[str, int] | None' = None, epoch_config: 'EpochConfig | None' = None, source_report: 'str | PathLike[str] | None' = None, keep_source_report: 'bool' = True, report: 'bool' = True, **parameters: 'Any') -> 'PipelineResult'
+```
+
+```text
+resume(checkpoint: 'str | PathLike[str]', save_path: 'str | PathLike[str]', subject: 'str | None' = None, *, selection_json: 'str | PathLike[str] | None' = None, exclude: 'Sequence[int] | None' = None, reviewer: 'str' = '', reason: 'str' = '', collect_stages: 'bool' = False, original_raw: 'mne.io.BaseRaw | None' = None, original_fif: 'str | PathLike[str] | None' = None, report: 'bool' = True) -> 'PipelineResult'
 ```
 
 ```text
@@ -190,11 +194,16 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 | 接口 | 输入与返回值 |
 |---|---|
 | run | raw：连续 MNE BaseRaw，EEG/EOG/ECG 单位 V，输入不变。save_path：输出目录；subject：安全文件名前缀。config/config_file：上述配置来源。montage：显式提供时替换工作副本的电极几何；保留既有实测坐标时请省略。collect_stages=False 避免额外阶段副本。events：n×3 整数数组，第一列为包含 first_samp 的绝对 MNE 样本。event_id：条件名→整数码。epoch_config：分段覆盖。invocation：调用来源字典。其他关键字：全部 PipelineConfig 字段。 |
-| PipelineResult | raw：清理后的 Raw，等待 ICA 复核时为 None；report：诊断字典；stages：要求收集的内存快照；status：运行状态；outputs：实际输出路径。review_required 表示后续分析前需判断报告中的质量问题。 |
+| epoch | raw：已完成连续预处理的 MNE Raw，无需原输入，不重复连续预处理。save_path：新目录；subject：可选文件名前缀。events/event_id 与 run 使用相同 MNE 样本约定。tmin/tmax/baseline 是 epoch_tmin/epoch_tmax/epoch_baseline 的短写。可传 config/config_file、epoch_config 和相关 QC 参数。source_report=None 自动寻找此前 HTML／报告包，路径表示手动指定。keep_source_report=True 保留原 HTML；report 默认 True，False 延迟绘图及 HTML。 |
+| PipelineResult | raw：连续结果，不可用时 None；epochs：分段结果或 None，整段流程可按需读取；report：诊断字典；stages：要求收集的内存快照；status：处理状态；outputs：实际输出路径。review_required 表示后续分析前需判断报告中的质量问题。 |
 | resume | checkpoint：checkpoint.json；save_path：新输出位置；subject：可选前缀。selection_json 与 exclude 二选一，后者为完整 0 起始列表，[] 全保留。reviewer/reason 记录人工决策。original_raw 或 original_fif 提供身份匹配的原始数据；内存输入或原文件移动时应显式提供。collect_stages 默认 False。不重复 ICA/ICLabel，不修改科学参数。 |
-| render_report | source：PipelineResult 或已有 HTML；report_path：新 HTML 路径。使用内嵌诊断重建布局，不重新处理 EEG。 |
+| render_report | source：PipelineResult、已有 HTML 或报告数据 NPZ；report_path：新 HTML 路径。复用已有图片或绘制已采集诊断，不重跑预处理或分段 QC，返回 HTML 路径。 |
 | resolve_config | path：可选 JSON 路径、字典或 PipelineConfig；关键字覆盖优先级最高。返回不可变 PipelineConfig，不隐式查找文件。 |
 | prepare_data | source：支持的文件或 Neuracle 目录；output_fif=None 仅返回内存数据，指定路径还输出 FIF/.events.json/.preparation.json。channel_types、rename 为映射；drop 为通道名序列；montage 为实际几何；event_id 为标注描述→整数码。allow_legacy_uv_per_mm=False 仅针对已确认的旧 Neuracle 校准。return_result=False 返回 Raw；True 返回 PreparationResult(raw, events, event_id, provenance, outputs)。不滤波、不参考、不清理。 |
+
+## 报告控制
+
+以下为运行参数，不增加 PipelineConfig 字段。run 与 epoch 均默认 report=True。report=False 采集有限诊断素材并写一个 *_report_data.npz，不绘图、不写 HTML；即时模式写 HTML，不额外写包。epoch 的来源报告为可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并 HTML 成功后删除旧 HTML，延迟交付不提前删除。自动查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
 
 ## 全部 CLI 参数
 
@@ -207,6 +216,7 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 | `--resume` | `resume` | False |
 | `--save-path` | `save_path` | True |
 | `--subject` | `subject` | True |
+| `--report` / `--no-report` | `report` | False |
 | `--preset` | `preset` | False |
 | `--ica-mode` | `ica_mode` | False |
 | `--ica-exclude` | `ica_exclude` | False |
@@ -268,7 +278,51 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 eegproc --input-fif prepared/sub01_raw.fif --save-path outputs/sub01 --subject sub01 --purpose erp --task-name oddball --epochs --set report_window_seconds=4.0
 eegproc --input-fif prepared/sub02_raw.fif --save-path outputs/sub02 --subject sub02 --purpose rest --asr-cutoff off --set ica_enabled=false
 eegproc --resume outputs/review/sub01_ica_review/checkpoint.json --save-path outputs/revised --subject sub01 --ica-exclude 1 4 --original-fif prepared/sub01_raw.fif
+eegproc --input-fif prepared/sub03_raw.fif --save-path outputs/sub03 --subject sub03 --no-report
+eegproc-epoch --input-fif outputs/sub03/sub03_cont_raw.fif --save-path outputs/sub03_epochs --subject sub03 --events-json prepared/sub03.events.json --tmin -0.2 --tmax 1.0 --no-report
+eegproc-report --source outputs/sub03_epochs/sub03_report_data.npz --output outputs/sub03_epochs/sub03_report.html
 ```
+
+### `eegproc-epoch`
+
+| Flags | Destination | Required |
+|---|---|---|
+| `-h` / `--help` | `help` | False |
+| `--input-fif` | `input_fif` | True |
+| `--save-path` | `save_path` | True |
+| `--subject` | `subject` | False |
+| `--config` | `config` | False |
+| `--task-name` | `task_name` | False |
+| `--events-json` | `events_json` | False |
+| `--epoch-mode` | `epoch_mode` | False |
+| `--event-source` | `event_source` | False |
+| `--event-names` | `event_names` | False |
+| `--stim-channel` | `stim_channel` | False |
+| `--tmin` | `tmin` | False |
+| `--tmax` | `tmax` | False |
+| `--baseline` | `baseline` | False |
+| `--fixed-epochs` | `fixed_epoch_duration` | False |
+| `--fixed-overlap` | `fixed_epoch_overlap` | False |
+| `--epoch-qc` | `epoch_qc` | False |
+| `--repair-epochs` / `--no-repair-epochs` | `repair_epochs` | False |
+| `--residual-peak-uv` | `residual_peak_uv` | False |
+| `--residual-ptp-uv` | `residual_ptp_uv` | False |
+| `--residual-robust-z` | `residual_robust_z` | False |
+| `--residual-relative-min-ptp-uv` | `residual_relative_min_ptp_uv` | False |
+| `--seed` | `seed` | False |
+| `--n-threads` | `n_threads` | False |
+| `--source-report` | `source_report` | False |
+| `--keep-source-report` / `--no-keep-source-report` | `keep_source_report` | False |
+| `--report` / `--no-report` | `report` | False |
+| `--set` | `settings` | False |
+
+### `eegproc-report`
+
+| Flags | Destination | Required |
+|---|---|---|
+| `-h` / `--help` | `help` | False |
+| `--source` | `source` | True |
+| `--output` | `output` | True |
 
 ### 数据准备命令
 

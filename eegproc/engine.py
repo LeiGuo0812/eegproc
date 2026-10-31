@@ -119,7 +119,7 @@ def _resolve_epoch_request(raw, config, events, event_id, epoch_config):
 
 
 def preprocess_raw(raw, save_path, subject, *, config=None, montage=None, collect_stages=False,
-                        events=None,event_id=None,epoch_config=None,invocation=None):
+                        events=None,event_id=None,epoch_config=None,invocation=None,generate_report=True):
     """Preserve MNE timing, events, auxiliary channels and digitization.
 
     Already-applied projections cannot be undone; SSP projectors are rejected
@@ -144,6 +144,8 @@ def preprocess_raw(raw, save_path, subject, *, config=None, montage=None, collec
         raise ValueError("Resolve SSP projectors explicitly before running this ICLabel pipeline")
     from .raw_helpers import raw_slice, signal_hash
     current = raw.copy().load_data()
+    from .epoch_metadata import prepare_annotations
+    prepare_annotations(current)
     picks = mne.pick_types(current.info, eeg=True, exclude=[])
     if len(picks) < 8 or any(not np.isfinite(current.get_data(picks=picks,start=a,stop=min(a+65536,current.n_times))).all()
                              for a in range(0,current.n_times,65536)):
@@ -168,7 +170,8 @@ def preprocess_raw(raw, save_path, subject, *, config=None, montage=None, collec
         "event_id": dict(event_id or {}),
         "input_summary": {"sfreq": current.info["sfreq"], "n_times": current.n_times,
                           "duration_seconds": current.n_times/current.info["sfreq"], "first_samp": current.first_samp},
-        "quality_flags": [], "warnings": [], "truth_used": False}
+        "quality_flags": [], "warnings": [], "truth_used": False,
+        "report_requested": generate_report}
     from .backends import alignment_notes
     report['alignment_notes']=alignment_notes(config)
     if epoch_config is not None:report['effective_epoch_config']=asdict(epoch_config)
@@ -245,9 +248,9 @@ def preprocess_raw(raw, save_path, subject, *, config=None, montage=None, collec
         report['provenance']['processing_finished_utc'] = utc_now()
         report["elapsed_seconds"] = time.perf_counter() - started
         report["outputs"] = {k:str(v) for k,v in paths.items()}
-        from .quality_report import safe_report
+        from .reporting import emit_report
         completed = report['status'] in ('completed', 'review_required', 'awaiting_ica_review')
-        safe_report(report, paths['quality_report'], original=raw if completed else None,
+        emit_report(report, paths['quality_report'], generate=generate_report, original=raw if completed else None,
                             clean=current if completed else None, ica=model, training=diagnostic_training)
     return current, report, stages
 
