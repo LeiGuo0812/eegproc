@@ -98,7 +98,7 @@ def _auxiliary_equal(original,clean,picks,block_samples=65536):
 
 
 def capture_signal_audit(report,original,clean):
-    from .quality_figures import bad_spans
+    from .report_materials import bad_spans
     from .checkpoint_input import metadata_identity,metadata_equal
     types=original.get_channel_types();aux=[i for i,t in enumerate(types) if t!='eeg']
     before=Counter(_ann_key(a) for a in original.annotations);after=Counter(_ann_key(a) for a in clean.annotations)

@@ -274,7 +274,8 @@ def epoch_raw(raw, save_path, subject=None, *, config=None, config_file=None,
         record['outputs'] = {key: str(value) for key, value in paths.items()}
         record['epoching']['finished_utc'] = utc_now()
         ok = emit_report(record, paths['quality_report'], generate=report)
-        if (ok and report and record['status'] in ('completed','review_required')
+        if (ok and report and record.get('report_status') == 'completed'
+                and record['status'] in ('completed','review_required')
                 and not keep_source_report and source_path is not None
                 and source_path.suffix.lower() == '.html' and source_path != paths['quality_report']):
             try:

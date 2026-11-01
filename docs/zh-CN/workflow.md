@@ -301,18 +301,19 @@ flowchart TB
 
 ```mermaid
 flowchart TB
-    accTitle: 即时与延迟报告交付
-    accDescr: 采集有限诊断素材后，立即绘制 HTML 或保存一个数据包以便后续生成。
-    collect_data["采集诊断数据"] --> report_enabled{"report=True？"}
-    report_enabled -->|是| draw_now["绘制报告图表"]
-    draw_now --> html_now["写入 HTML"]
+    accTitle: 隔离的即时与延迟报告
+    accDescr: 先采集数值诊断，在全新子进程中即时或后续渲染，报告不完整时保留恢复素材。
+    collect_data["采集数值诊断"] --> report_enabled{"report=True?"}
+    report_enabled -->|是| spawn["启动报告子进程"]
+    spawn --> draw["渲染保存的诊断"]
+    draw --> html["提交 HTML"]
     report_enabled -->|否| package["保存报告数据包"]
     package --> render_later["调用 render_report"]
-    render_later --> draw_later["绘制已存诊断素材"]
-    draw_later --> html_later["后续写入 HTML"]
+    render_later --> spawn
+    draw -->|不完整| recovery["保留素材包和日志"]
 ```
 
-`run()` 和 `epoch()` 均默认即时生成 HTML。`report=False` 时仅保存一个 `*_report_data.npz`，运行中不绘图、不写 HTML；保留代表性处理前后窗口、频谱摘要、ICA 诊断和 QC 记录，不复制整份原始 Raw。报告生成不重跑去噪或分段质控；已有 HTML 也可复用内嵌图片重新生成。科学默认参数和四秒波形显示时间窗不变。
+`run()`、`epoch()`、`resume()` 默认通过全新报告子进程即时生成 HTML。数据处理调用方先采集有限数值素材，不主动导入 Agg 或字体渲染组件；MNE 自身仍可能导入 Matplotlib。`report=False` 时仅保存一个 `*_report_data.npz`，不绘图、不写 HTML。保留代表性处理前后窗口、频谱摘要、ICA 诊断和 QC 记录，不复制整份原始 Raw。报告生成不重跑去噪或分段质控；已有 HTML 通过相同隔离路径复用内嵌图片。完整即时报告会清理临时素材，部分完成或失败时保留有限素材包和日志供重试。报告状态与处理状态分开。科学默认参数和四秒波形显示时间窗不变。
 
 ## 输入与交付文件
 
@@ -352,4 +353,4 @@ flowchart TB
 
 `pre_ica_raw.fif` 保存 IC 减除前的分析频段信号。`decomposition-ica.fif` 是冻结模型；`checkpoint.json` 记录续处理设置、身份校验及报告数据。
 
-正常完成且启用 ICA 时通常为**六个文件**：三个结果文件加三个断点文件。保留 epochs 时再加一个；`report=False` 时以报告包替代即时 HTML。只运行 review 时输出 HTML 或延迟报告包和断点；关闭 ICA 时没有模型及断点。独立分段只写保留试次 FIF 和一个 HTML 或报告包，不复制连续数据或 ICA。大 FIF 可能拆成编号分卷。不生成 `original_raw.fif`、`preview_raw.fif`、逐阶段快照或报告图片/表格附件。`selection.json` 由复核者在需要时手动下载。
+启用 ICA 且报告完整生成时通常为**六个文件**：三个结果文件加三个断点文件。报告部分完成或失败时，另外保留有限素材包及错误日志供重试。保留 epochs 时再加一个；`report=False` 时以报告包替代即时 HTML。只运行 review 时输出 HTML 或延迟报告包和断点；关闭 ICA 时没有模型及断点。独立分段只写保留试次 FIF 和一个 HTML 或报告包，不复制连续数据或 ICA。大 FIF 可能拆成编号分卷。不生成 `original_raw.fif`、`preview_raw.fif`、逐阶段快照或报告图片/表格附件。`selection.json` 由复核者在需要时手动下载。

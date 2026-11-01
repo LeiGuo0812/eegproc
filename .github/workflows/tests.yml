@@ -60,6 +60,7 @@ jobs:
       OMP_NUM_THREADS: '1'
       OPENBLAS_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
+      NUMEXPR_NUM_THREADS: '1'
       VALIDATION_EXTRAS: ${{ matrix.extras }}
       VALIDATION_TESTS: ${{ matrix.tests }}
     steps:
@@ -108,6 +109,9 @@ jobs:
               'tests/test_clean_install_validator.py', 'tests/test_configuration.py',
               'tests/test_config_api_refactor.py', 'tests/test_runtime_parameters.py',
               'tests/test_eegproc_namespace.py', 'tests/test_montage_resource.py',
+              'tests/test_report_materials.py', 'tests/test_report_isolation.py',
+              'tests/test_deferred_report.py', 'tests/test_batch_recovery.py',
+              'tests/test_report_checkpoint_compatibility.py',
           ]
           targets = ['tests'] if os.environ['VALIDATION_TESTS'] == 'all' else base_tests
           subprocess.run([str(python), '-B', '-m', 'pytest', '-q', *targets], check=True)

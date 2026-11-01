@@ -301,18 +301,19 @@ The source report is optional and supplies presentation material, not BAD decisi
 
 ```mermaid
 flowchart TB
-    accTitle: Immediate and delayed report delivery
-    accDescr: Collect bounded diagnostic material once, then either render HTML immediately or save one package for later rendering.
-    collect_data["Collect diagnostic data"] --> report_enabled{"report=True?"}
-    report_enabled -->|Yes| draw_now["Draw report figures"]
-    draw_now --> html_now["Write HTML"]
+    accTitle: Isolated immediate and delayed reports
+    accDescr: Collect numeric diagnostics, render them in a fresh subprocess now or later, and retain recovery material if delivery is incomplete.
+    collect_data["Collect numeric diagnostics"] --> report_enabled{"report=True?"}
+    report_enabled -->|Yes| spawn["Start report subprocess"]
+    spawn --> draw["Render stored diagnostics"]
+    draw --> html["Commit HTML"]
     report_enabled -->|No| package["Save report-data package"]
     package --> render_later["Call render_report"]
-    render_later --> draw_later["Draw stored diagnostics"]
-    draw_later --> html_later["Write HTML later"]
+    render_later --> spawn
+    draw -->|Incomplete| recovery["Retain package and log"]
 ```
 
-Both `run()` and `epoch()` default to immediate HTML. `report=False` saves one `*_report_data.npz`, with no drawing or HTML during processing. Representative before/after windows, spectrum summaries, ICA diagnostics and QC records are retained; a full original Raw is not copied. Rendering does not rerun denoising or epoch QC. Existing HTML can also be rendered again using its embedded figures. Scientific defaults and the four-second waveform display window are unchanged.
+`run()`, `epoch()` and `resume()` default to immediate HTML through a fresh report subprocess. The data-processing caller first collects bounded numeric material without actively importing Agg or font-rendering components; MNE itself may import Matplotlib. `report=False` saves one `*_report_data.npz`, with no drawing or HTML. Representative before/after windows, spectrum summaries, ICA diagnostics and QC records are retained; a full original Raw is not copied. Rendering does not rerun denoising or epoch QC. Existing HTML reuses embedded figures in the same isolated path. A complete immediate report removes temporary material; partial or failed rendering retains a compact package and log. Report status is independent of processing status. Scientific defaults and the four-second waveform display window are unchanged.
 
 ## Input and delivered files
 
@@ -352,4 +353,4 @@ flowchart TB
 
 `pre_ica_raw.fif` contains the analysis-band signal before IC subtraction. `decomposition-ica.fif` is the frozen model; `checkpoint.json` records continuation settings, identity checks and report data.
 
-The normal completed ICA run contains **six files**: three result files and the three-file checkpoint. Retained epochs add one file. With `report=False`, the report-data package replaces the immediate HTML. Review-only mode creates the report or deferred package plus the checkpoint; ICA-disabled runs have neither model nor checkpoint. Standalone epoching writes retained epoch FIF and one HTML or package, without a continuous-data or ICA copy. Large FIFs may have numbered parts. No `original_raw.fif`, `preview_raw.fif`, stage-by-stage snapshots, or report image/table attachments are generated. The optional `selection.json` is downloaded by the reviewer.
+The normal ICA run with a completed report contains **six files**: three result files and the three-file checkpoint. Partial or failed rendering additionally retains compact report material and an error log for retry. Retained epochs add one file. With `report=False`, the report-data package replaces the immediate HTML. Review-only mode creates the report or deferred package plus the checkpoint; ICA-disabled runs have neither model nor checkpoint. Standalone epoching writes retained epoch FIF and one HTML or package, without a continuous-data or ICA copy. Large FIFs may have numbered parts. No `original_raw.fif`, `preview_raw.fif`, stage-by-stage snapshots, or report image/table attachments are generated. The optional `selection.json` is downloaded by the reviewer.

@@ -46,14 +46,62 @@ def review_items(report, rows):
     return [dict(priority='Review',title='Observation',evidence=n,action='') for n in notes]
 
 
-def save_quality_report(report, report_path, *, original=None, clean=None, ica=None, training=None, reuse_figures=False):
+def _report_completeness(report, rows):
+    """Require figures only when their source material or results apply."""
+    viz=report['visualizations'];material=report.get('report_materials',{})
+    expected=set()
+    if 'waveforms' in material:
+        expected.update(f'waveform_{i+1}' for i in range(len(material['waveforms'].get('windows',[]))))
+    for name,key in [('psd','psd'),('sensors','bad_channels'),('timeline','bad_timeline'),
+                     ('whole_record_qc','whole_record_qc')]:
+        if name in material:expected.add(key)
+    ica=material.get('ica',{})
+    if 'maps' in ica:
+        expected.update(f'ica_topomap_{i}' for i in range(len(ica['maps'][0]) if len(ica['maps']) else 0))
+    display=material.get('ica_display',{})
+    expected.update(f['key'] for f in display.get('figures',[]))
+    if report.get('line_diagnostics',{}).get('status')=='available':expected.add('line_noise')
+    if rows:expected.add('epoch_retention')
+    available={f.get('key') for f in viz.get('figures',[]) if f.get('data_uri')}
+    missing=sorted(expected-available)
+    if missing:
+        viz.setdefault('errors',[]).append(dict(section='completeness',type='MissingFigures',
+            message='Missing report figures: '+', '.join(missing)))
+    probabilities=report.get('ica',{}).get('probabilities',[])
+    if probabilities:
+        expected.update(f'ica_topomap_{i}' for i in range(len(probabilities)))
+        extra_missing=sorted(expected-available-set(missing))
+        if extra_missing:
+            missing+=extra_missing
+            viz.setdefault('errors',[]).append(dict(section='completeness',type='MissingFigures',
+                message='Missing report figures: '+', '.join(extra_missing)))
+    details=report.get('ica_diagnostics',[])
+    if probabilities and ({d.get('component') for d in details}!=set(range(len(probabilities)))
+                          or len(details)!=len(probabilities)):
+        viz.setdefault('errors',[]).append(dict(section='ica',type='MissingDiagnostics',
+            message='ICA component diagnostics are incomplete'))
+    report['report_completeness']=dict(expected_figures=sorted(expected),missing_figures=missing,
+        error_count=len(viz.get('errors',[])))
+    report['report_status']='partial' if viz.get('errors') else 'completed'
+    if report['report_status']=='partial':
+        recovery=report.get('report_execution',{}).get('recovery',{})
+        report.setdefault('outputs',{}).update(recovery)
+    else:
+        for name in ('report_data','report_log','expected_report'):
+            report.setdefault('outputs',{}).pop(name,None)
+        report.get('report_execution',{}).pop('recovery',None)
+
+
+def save_quality_report(report, report_path, *, original=None, clean=None, ica=None, training=None,
+                        reuse_figures=False, output_path=None):
     from .quality_figures import build_signal_figures,build_material_figures,retention_figure,style,CLASS_NAMES
     from .report_provenance import capture_signal_audit,methods_text,references,data_inventory,utc_now
     started=time.perf_counter();page=Path(report_path).resolve();page.parent.mkdir(parents=True,exist_ok=True)
     if page.suffix.lower()!='.html':raise ValueError('report_path must end in .html')
-    base=page.name.removesuffix('_report.html')
+    advertised=Path(output_path).resolve() if output_path else page
+    base=advertised.name.removesuffix('_report.html')
     folder=page.parent;cfg=report.get('config',{});outputs=report.setdefault('outputs',{})
-    outputs.update(quality_report=str(page))
+    outputs.update(quality_report=str(advertised))
     if original is not None and clean is not None:
         try:report['visualizations']=build_signal_figures(report,original,clean,folder,ica,training)
         except Exception as exc:report['visualizations']=dict(figures=[],notes=[],errors=[dict(section='paired_signals',message=str(exc),type=type(exc).__name__)])
@@ -69,13 +117,15 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
     else:
         viz['figures']=[f for f in viz['figures'] if f['key']!='epoch_retention']
         try:
-            with style(cfg):f,rows=retention_figure(report,folder)
+            with style(dict(cfg,_report_progress=report.get('report_execution',{}).get('mode')=='subprocess')):
+                f,rows=retention_figure(report,folder)
             if f:viz['figures'].append(f)
         except Exception as exc:viz['errors'].append(dict(section='epochs',message=str(exc),type=type(exc).__name__))
     images={}
     for f in viz['figures']:
         if f.get('data_uri'):images[f['key']]=f['data_uri']
-    report['report_audit']=dict(schema_version='1.0',updated_utc=utc_now(),tables={},data_files=data_inventory(report,page.parent))
+    _report_completeness(report,rows)
+    report['report_audit']=dict(schema_version='1.0',updated_utc=utc_now(),tables={},data_files=data_inventory(report,advertised.parent))
     status=report.get('status','unknown');ic=report.get('ica',{});ep=report.get('epochs',{});quality=report.get('quality',{})
     observations=review_items(report,rows)
     report['human_review']=dict(processing_completed=status in ('completed','review_required'),decision='pending',
@@ -89,7 +139,7 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
     adjustments=report.get('parameter_adjustments',[])
     epoch_resolution=report.get('epoch_resolution',{})
     total=ep.get('input_events',ep.get('events_total'));kept=ep.get('retained_epochs')
-    summaries=[('Subject',report.get('provenance',{}).get('subject_label',base)),('Task name',cfg.get('task_name') or 'Not specified'),('Workflow','Standalone epoching' if report.get('epoching') else 'EEG preprocessing'),('Parameter preset',cfg.get('preset','standard')),('Status',labels.get(status,status)),
+    summaries=[('Subject',report.get('provenance',{}).get('subject_label',base)),('Task name',cfg.get('task_name') or 'Not specified'),('Workflow','Standalone epoching' if report.get('epoching') else 'EEG preprocessing'),('Parameter preset',cfg.get('preset','standard')),('Status',labels.get(status,status)),('Report status',report['report_status'].capitalize()),
         ('Analysis',cfg.get('purpose','not recorded')),('Input duration',str(summary.get('duration_seconds','n/a'))+' s'),
         ('Sampling frequency',str(summary.get('sfreq','n/a'))+' Hz'),('EEG channels',gate.get('total_eeg_channels')),
         ('Analysis / ICA band',f"{cfg.get('highpass')}–{cfg.get('lowpass')} Hz / {cfg.get('training_highpass')}–{cfg.get('training_lowpass')} Hz"),
@@ -223,16 +273,18 @@ def save_quality_report(report, report_path, *, original=None, clean=None, ica=N
         if report['report_storage']['total_bytes']==size:break
         report['report_storage'].update(total_bytes=size,html_bytes=size,over_target=size>2*1024**2)
     from .storage import atomic_write_text
-    atomic_write_text(page,document)
+    atomic_write_text(page,document,overwrite=False)
 
 
-def safe_report(report,report_path,*,original=None,clean=None,ica=None,training=None,reuse_figures=False):
+def safe_report(report,report_path,*,original=None,clean=None,ica=None,training=None,reuse_figures=False,
+                output_path=None):
     """Reporting failure never replaces a processing exception or loses results."""
     report['processing_status']=report.get('status','unknown')
     report['delivery_status']='completed' if report.get('status') in ('completed','review_required','awaiting_ica_review') else 'incomplete'
-    report['report_status']='completed'
+    report['report_status']='running'
     try:
-        save_quality_report(report,report_path,original=original,clean=clean,ica=ica,training=training,reuse_figures=reuse_figures)
+        save_quality_report(report,report_path,original=original,clean=clean,ica=ica,training=training,
+                            reuse_figures=reuse_figures,output_path=output_path)
         return True
     except Exception as exc:
         report['report_status']='failed'
@@ -241,7 +293,7 @@ def safe_report(report,report_path,*,original=None,clean=None,ica=None,training=
             from .storage import atomic_write_text
             minimal={k:report.get(k) for k in ('status','processing_status','delivery_status','report_status','report_error','error','outputs','config')}
             record=json.dumps(minimal,default=_json_default).replace('<',r'\u003c')
-            atomic_write_text(report_path,'<!doctype html><html lang="en"><title>EEG report</title><h1>Report unavailable</h1><p>'+esc(str(exc))+'</p><script id="run-record" type="application/json">'+record+'</script></html>')
+            atomic_write_text(report_path,'<!doctype html><html lang="en"><title>EEG report</title><h1>Report unavailable</h1><p>'+esc(str(exc))+'</p><script id="run-record" type="application/json">'+record+'</script></html>',overwrite=False)
         except Exception:
             pass
         return False

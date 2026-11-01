@@ -67,9 +67,11 @@ def test_trial_update_escapes_names_and_image_storage(tmp_path):
     assert '10 / 16' in page
     assert 'src="data:image/png;base64,' in page
     assert report['human_review']['decision']=='pending' and not report['human_review']['automatic_acceptance']
+    original_page=dest.read_bytes()
     report['epochs']['retained_epochs']=8
     report['epochs']['condition_retention']['2']['retained']=0
-    save_quality_report(report,dest)
+    save_quality_report(report,tmp_path/'updated_report.html')
+    assert dest.read_bytes()==original_page
     assert sum(f['key']=='epoch_retention' for f in report['visualizations']['figures'])==1
     assert '8 / 16' in Path(report['outputs']['quality_report']).read_text(encoding='utf8')
 

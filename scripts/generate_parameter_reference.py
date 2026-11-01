@@ -236,7 +236,7 @@ API = {
 
 ## Reporting controls
 
-These are runtime arguments, not additional PipelineConfig fields. run and epoch default to report=True. report=False collects bounded diagnostic material and writes one *_report_data.npz, without drawing or HTML; immediate mode writes HTML without an extra package. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a new combined HTML succeeds, never during deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
+These are runtime arguments, not additional PipelineConfig fields. run, epoch and resume default to report=True, with HTML rendered in a fresh subprocess. report=False collects bounded numeric material and writes one *_report_data.npz without drawing or HTML. The eegproc collector does not actively import Agg/font rendering; upstream MNE may still import Matplotlib. Complete immediate reports remove temporary material/logs; partial or failed reports retain recovery material and a log. report_status is completed, partial, failed or deferred, independent of processing status. Rendering uses at most two 300-second attempts; render_report returns complete/partial HTML and raises on failure, while data-processing APIs preserve their result if only reporting fails. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a completed combined report, never for partial, failed or deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
 
 ## Complete CLI flags
 
@@ -257,7 +257,7 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 
 ## 报告控制
 
-以下为运行参数，不增加 PipelineConfig 字段。run 与 epoch 均默认 report=True。report=False 采集有限诊断素材并写一个 *_report_data.npz，不绘图、不写 HTML；即时模式写 HTML，不额外写包。epoch 的来源报告为可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并 HTML 成功后删除旧 HTML，延迟交付不提前删除。自动查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
+以下为运行参数，不增加 PipelineConfig 字段。run、epoch、resume 均默认 report=True，HTML 由全新子进程渲染。report=False 采集有限数值素材并写一个 *_report_data.npz，不绘图、不写 HTML。eegproc 采集模块不主动导入 Agg／字体渲染组件；MNE 自身仍可能导入 Matplotlib。完整即时报告清理临时素材和日志；部分完成或失败时保留恢复素材及日志。report_status 区分 completed、partial、failed、deferred，与处理状态分开。渲染最多尝试两次，每次 300 秒；render_report 对完整／部分 HTML 返回路径，失败时抛异常，数据处理 API 在仅报告失败时保留处理结果。epoch 的来源报告可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并报告 completed 后删除旧 HTML，部分、失败或延迟时保留。查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
 
 ## 全部 CLI 参数
 

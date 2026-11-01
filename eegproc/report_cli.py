@@ -12,9 +12,12 @@ def parser():
 
 def main(argv=None):
     from .api import render_report
+    from .reporting import read_report_source
     args = parser().parse_args(argv)
     target = render_report(args.source, args.output)
-    print(json.dumps(dict(report=str(target), status='completed'), indent=2))
+    record=read_report_source(target)
+    print(json.dumps(dict(report=str(target), status=record['report_status'],
+                          processing_status=record.get('processing_status',record.get('status'))), indent=2))
 
 
 if __name__ == '__main__':

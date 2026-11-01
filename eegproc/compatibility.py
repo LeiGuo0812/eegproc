@@ -56,6 +56,10 @@ PACKAGED_V040_SOURCE_SHA256 = VERIFIED_RENAME_TARGET_SHA256
 # Frozen 0.4.0a2 continuation verified in epoch_feature_20261031: continuous
 # and epoch differences below 5e-19 V; no ICA refit. Pins remain exact.
 VERIFIED_EPOCH_TARGET_SHA256 = 'e4c8e8230a6371eca4a269d5b25da070f00ca06999bd43a4f1b24fe43f3a2c7f'
+PACKAGED_V040A3_SOURCE_SHA256 = VERIFIED_EPOCH_TARGET_SHA256
+# Report-only transition checked against the frozen 0.4.0a3 source, including
+# bitwise rest/ERP comparisons and continuation without repeating ICA fitting.
+VERIFIED_REPORT_TARGET_SHA256 = '2dcf79c70d3e7ddb457d82db0f95f59f298d0a69f1f1ebe5f7202d839fc0a6d3'
 LEGACY_V2_SOURCE_FILES = {
     "eeg_pipeline/_utils.py": "560369b76e2d1d91fa79f4cf5c23daae093a3c2acbbdb48ed1b3deacde229d4a",
     "eeg_pipeline/backends.py": "6baa4dd3ddafebed91086a1f1be88909eec963e91e7919cced05484c9b00e218",
@@ -121,6 +125,8 @@ def _verified_transitions():
     """Only explicit source/target pairs; no version-wide compatibility bypass."""
     legacy=_bundle(LEGACY_V2_SOURCE_FILES)
     result={}
+    if VERIFIED_REPORT_TARGET_SHA256:
+        result[(PACKAGED_V040A3_SOURCE_SHA256,VERIFIED_REPORT_TARGET_SHA256)]='verified-0.4.0a3-to-isolated-reports'
     if VERIFIED_EPOCH_TARGET_SHA256:
         result[(PACKAGED_V040_SOURCE_SHA256,VERIFIED_EPOCH_TARGET_SHA256)]='verified-0.4.0a2-to-standalone-epochs'
     if VERIFIED_RENAME_TARGET_SHA256:
@@ -140,6 +146,27 @@ def _verified_transitions():
         result[(PACKAGED_V030_SOURCE_SHA256,VERIFIED_NORMALIZATION_TARGET_SHA256)]='verified-0.3.0-to-parameter-resolution-v1'
         result[(legacy,VERIFIED_NORMALIZATION_TARGET_SHA256)]='verified-0.2.0-to-parameter-resolution-v1'
     return result
+
+
+def _verified_transition(source, target):
+    """Follow only exact, previously verified source/target pairs."""
+    transitions = _verified_transitions()
+    direct = transitions.get((source, target))
+    if direct is not None:
+        return direct
+    pending = [(source, [])]
+    visited = {source}
+    while pending:
+        current, labels = pending.pop(0)
+        for (start, end), label in transitions.items():
+            if start != current or end in visited:
+                continue
+            path = labels + [label]
+            if end == target:
+                return ' -> '.join(path)
+            visited.add(end)
+            pending.append((end, path))
+    return None
 
 
 def computation_manifest():
@@ -169,7 +196,7 @@ def validate_checkpoint_compatibility(payload):
         if sources != LEGACY_V2_SOURCE_FILES:
             raise ValueError('Source changed: legacy ICA checkpoint is not an explicitly verified baseline')
         source_digest=_bundle(sources)
-        transition=_verified_transitions().get((source_digest,current['source_bundle_sha256']))
+        transition=_verified_transition(source_digest,current['source_bundle_sha256'])
         if transition is None:
             raise ValueError('Source changed: legacy ICA checkpoint requires a verified compatibility target')
         versions = software.get('packages', {})
@@ -182,7 +209,7 @@ def validate_checkpoint_compatibility(payload):
         source_digest=recorded['source_bundle_sha256']
         transition='exact-computation-match'
         if sources != current['source_files_sha256']:
-            transition=_verified_transitions().get((source_digest,current['source_bundle_sha256']))
+            transition=_verified_transition(source_digest,current['source_bundle_sha256'])
             if transition is None:
                 changed = sorted(set(sources) ^ set(current['source_files_sha256']) |
                                  {p for p in sources.keys() & current['source_files_sha256'].keys()

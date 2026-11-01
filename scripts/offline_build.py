@@ -38,7 +38,9 @@ def inspect_artifacts(wheel, sdist):
         assert not any(Path(name).parts[0] in {'eeg_pipeline', 'mne_asr'} for name in names)
         for name in ('eegproc/prepare_cli.py', 'eegproc/io/neuracle.py', 'eegproc/cli.py',
                      'eegproc/epoch_cli.py', 'eegproc/report_cli.py', 'eegproc/epoching.py',
-                     'eegproc/epoch_metadata.py', 'eegproc/report_data.py'):
+                     'eegproc/epoch_metadata.py', 'eegproc/report_data.py',
+                     'eegproc/report_materials.py', 'eegproc/report_process.py',
+                     'eegproc/report_worker.py'):
             assert name in names, name
         metadata_name = next(name for name in names if name.endswith('.dist-info/METADATA'))
         metadata = Parser().parsestr(archive.read(metadata_name).decode('utf-8'))
@@ -64,7 +66,8 @@ def inspect_artifacts(wheel, sdist):
                          'README.md', 'README.zh-CN.md', 'LICENSE', 'NOTICE',
                          'docs/en/usage.md', 'docs/zh-CN/usage.md',
                          'docs/en/workflow.md', 'docs/zh-CN/workflow.md',
-                         'docs/THIRD_PARTY_NOTICES.md'):
+                         'docs/THIRD_PARTY_NOTICES.md',
+                         'tests/fixtures/computation_v040a3.json'):
             assert required in relative, required
         assert not any(name.endswith('.fif') for name in relative)
     return {'name': metadata['Name'], 'version': metadata['Version'],

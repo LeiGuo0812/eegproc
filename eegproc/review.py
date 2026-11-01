@@ -23,7 +23,7 @@ def _write(path,payload):
 
 def save_checkpoint(original,current,analysis,preview,model,config,report,directory,subject,events,event_id,epoch_config,paths):
     from .checkpoint_input import input_reference
-    from .quality_figures import ica_figures,style
+    from .report_materials import ica_data
     started=time.perf_counter()
     if report['ica'].get('applied') or model.exclude:
         raise ValueError('ICA checkpoint must be saved before applying component exclusions')
@@ -45,16 +45,9 @@ def save_checkpoint(original,current,analysis,preview,model,config,report,direct
     artifacts['pre_ica']=target.relative_to(directory).as_posix()
     files.extend(dict(path=Path(p).relative_to(directory).as_posix(),sha256=file_hash(p)) for p in saved)
     del pre_ica
-    # Persist only component plots and downsampled numeric diagnostics, never
-    # another original or training-preview recording.
-    if report.get('report_requested', True):
-        with style(report.get('config',{})):
-            figures,notes=ica_figures(report,folder,model,preview)
-        report['ica_display']=dict(figures=figures,notes=notes,
-                                  diagnostics=report.get('ica_diagnostics',[]))
-    else:
-        from .quality_figures import ica_data
-        report['ica_materials']=ica_data(report,model,preview)
+    # Capture bounded numeric diagnostics before subtraction; rendering belongs
+    # to the isolated report process, including reports for ICA review.
+    report['ica_materials']=ica_data(report,model,preview)
     # The final model records applied exclusions. Keep a separate frozen decomposition
     # so later saves cannot invalidate the pre-application checkpoint.
     frozen_model=folder/'decomposition-ica.fif'
@@ -74,7 +67,7 @@ def save_checkpoint(original,current,analysis,preview,model,config,report,direct
         root='..',model_sha256=file_hash(frozen_model),applied=False,
         original_input=input_reference(original,report['input_sha256']),
         compatibility=copy.deepcopy(report['provenance']['computation']))
-    payload['report'].pop('ica_diagnostics',None)  # Stored once in ica_display.
+    payload['report'].pop('ica_diagnostics',None)  # Rebuilt from saved diagnostics.
     # The checkpoint save is complete once this JSON is committed.
     for step in payload['report'].get('execution',[]):
         if step['stage']=='save_ica_checkpoint' and step['status']=='running':

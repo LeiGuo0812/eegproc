@@ -1,6 +1,6 @@
 # Third-party sources and notices
 
-Version 0.4.0a3. Project-owned code and documentation are BSD-3-Clause,
+Version 0.4.0a4. Project-owned code and documentation are BSD-3-Clause,
 as selected by the maintainer. The root LICENSE does not replace third-party
 copyright notices or licenses. The root NOTICE summarizes the inventory.
 

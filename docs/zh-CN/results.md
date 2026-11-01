@@ -19,7 +19,7 @@ outputs/sub01/
 
 请求分段且存在保留试次时，另写 `sub01_clean-epo.fif`。全部试次被拒绝时不写空 epochs。review 模式仅输出 HTML 和三个断点文件，尚未形成最终清理数据。关闭 ICA 时不产生 ICA 模型及断点。续处理复用父断点，写新的结果文件。较大 FIF 可能拆成编号分卷，输出清单中的所有分卷都要保留。
 
-`report=False` 时以 `sub01_report_data.npz` 替代即时 HTML，包中保存有限绘图数据和 QC 记录，之后通过 `render_report()` 绘制，不重复预处理。即时报告不会额外保存数据包。独立分段只输出有保留试次时的 `sub01_clean-epo.fif`，以及一个 HTML 或报告包，不复制连续数据或 ICA 断点。
+`report=False` 时以 `sub01_report_data.npz` 替代即时 HTML，包中保存有限绘图数据和 QC 记录，之后通过 `render_report()` 绘制，不重复预处理。完整即时报告不保留临时数据包；报告不完整时保留恢复素材和日志。独立分段只输出有保留试次时的 `sub01_clean-epo.fif`，以及一个 HTML 或报告包，不复制连续数据或 ICA 断点。
 
 不生成 `original_raw.fif`、`preview_raw.fif`、全程训练副本或图片/表格附件。准备后的原始输入应另行保留，因为 ICA 续处理会核验它。独立分段只需清理后 Raw/FIF，其中已保存 BAD 来源及原全局坏导名单。`pre_ica_raw.fif` 是**减除 IC 之前**的恢复点，不是未经滤波的原始数据，也不是整个预处理开始前的数据。
 
@@ -33,6 +33,17 @@ outputs/sub01/
 记录中另区分处理、交付和报告生成状态。后续报告或分段失败时，前面成功保存的 FIF 可能仍存在。磁盘上有 HTML，不等于全部请求都成功执行。
 
 `report_status="deferred"` 表示主动延迟报告，可用数据包后续生成 HTML。独立分段没有可用事件时，分段解析状态为跳过；全部试次拒绝时保留数为零，不写分段 FIF。两种情况均在 HTML 或报告包中记录原因。`.epochs` 提供分段结果，`.outputs` 只列实际生成文件。
+
+`report_status` 单独描述报告生成，不代表 EEG 是否合格：
+
+| 报告状态 | 含义 | 后续操作 |
+|---|---|---|
+| `completed` | 所有适用报告内容已生成 | 按研究标准复核数据。 |
+| `partial` | 已有 HTML，但存在缺失内容或绘图错误 | 阅读错误项，从保留素材重试。 |
+| `failed` | 渲染退出、超时，或 HTML 未能提交 | 使用保留的素材和日志，在新目标重试。 |
+| `deferred` | 主动延迟 HTML | 需要时调用 `render_report()`。 |
+
+渲染通过全新子进程执行，最多尝试两次，每次 300 秒。仅渲染失败时，已完成的数据结果仍然可用。报告不完整时保留有限的 `*_report_data.npz` 和 `*_report_errors.log`；完整即时报告会清理临时渲染文件。传给 `render_report()` 的来源包保持不变。`report_execution` 记录尝试和退出码。批量运行另写 `batch_summary.json` 和每份记录的简短 `batch_result.json` 供恢复，不属于额外算法阶段快照。
 
 ## 建议按以下顺序读报告
 

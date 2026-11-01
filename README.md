@@ -75,57 +75,25 @@ render_report(seg, "outputs/sub01_epochs/sub01_report.html")
 epochs = seg.epochs
 ```
 
-Both `run()` and `epoch()` default to `report=True`. With `report=False`, no figures or HTML are produced during processing; one `*_report_data.npz` stores bounded diagnostic material for later rendering. No full original Raw is copied. `render_report()` accepts a result, an existing HTML, or a report-data package.
+`run()`, `epoch()` and `resume()` default to `report=True`, with rendering isolated in a fresh subprocess. With `report=False`, no figures or HTML are produced; one `*_report_data.npz` stores bounded diagnostic material for later rendering. The eegproc collector does not import Agg or font rendering; upstream MNE operations may still import Matplotlib. No full original Raw is copied. `render_report()` accepts a result, an existing HTML, or a report-data package and uses the same isolated renderer. Report status is `completed`, `partial`, `failed` or `deferred`, separate from processing status. Incomplete rendering retains compact material and an error log for recovery.
 
 `epoch()` reads BAD origins and global bad-channel information from the cleaned Raw/FIF. Input, manual and unknown BAD remain exclusions; event-window QC reevaluates only marked automatic residuals. It automatically looks for the previous HTML or report-data package; use `source_report="path/to/report.html"` to select one explicitly. Missing or unreadable reports produce a warning and an independent epoch report. Source HTML is kept by default. See [standalone epoching and reports](docs/en/usage.md#standalone-epoching).
 
 The corresponding commands are `eegproc-epoch` and `eegproc-report`. Run [epoch_and_report.py](examples/epoch_and_report.py) for a complete generated-data example.
 
-## Parallel processing
+## Batch and parallel processing
 
-Independent recordings can run concurrently in separate processes. `max_workers` selects the number of recordings processed at once; `n_threads` limits supported numerical-library thread pools within a recording and does not start batch workers. The included CSV batch example runs sequentially.
+Use the [CSV batch example](examples/batch_process.py) to run each recording in a fresh process. The parent records ordinary errors, unexpected process exits and timeouts while other recordings continue. Reports are rendered in separate subprocesses after completed EEG results have been saved.
 
-Save this as `parallel_preprocess.py` and run `python parallel_preprocess.py` from a terminal:
-
-```python
-import os
-
-# Set these before importing NumPy, MNE or PyTorch.
-for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
-    os.environ[name] = "1"
-
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import get_context
-from pathlib import Path
-
-
-def process_one(job):
-    recording_id, input_fif = job
-    import mne
-    from eegproc import run
-
-    with mne.io.read_raw_fif(input_fif, preload=False, verbose=False) as raw:
-        result = run(
-            raw, Path("outputs_parallel") / recording_id, recording_id,
-            purpose="rest", task_name="eyes_closed", n_threads=1,
-        )
-        return (recording_id, result.status, result.report.get("report_status"),
-                result.outputs["quality_report"])
-
-
-if __name__ == "__main__":
-    jobs = [
-        ("sub01_rest", "prepared/sub01_raw.fif"),
-        ("sub02_rest", "prepared/sub02_raw.fif"),
-    ]
-    with ProcessPoolExecutor(max_workers=2, mp_context=get_context("spawn")) as pool:
-        for recording_id, status, report_status, html in pool.map(process_one, jobs):
-            print(f"{recording_id}: {status}; report={report_status}; {html}")
+```bash
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2
+# Continue the same batch after an interruption or report failure:
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-Keep the worker at module level and retain the `__main__` guard; run this example as a `.py` file rather than directly in a notebook cell ([Python process-pool requirements](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor)). Each `recording_id` must be unique and each recording needs its own **new output directory**, including separate tasks or sessions from the same participant. Pass paths to workers and return small summaries, rather than transferring Raw data or PipelineResult objects between processes.
+The manifest and directory layout are described in [Complete usage](docs/en/usage.md#executable-examples). Keep the manifest rows unchanged when resuming. Completed recordings are skipped; deferred, partial or failed reports are retried from saved report data, without repeating preprocessing. Failed or incomplete scientific processing needs a new output directory after the cause is resolved. The example does not automatically retry scientific computation.
 
-Start with two workers and `n_threads=1`, then increase workers only when memory permits: each process still loads the recording and processing buffers. The environment settings reduce nested numerical threading; `n_threads` is not a strict limit on every thread in the process. Use process isolation for concurrent pipeline runs because plotting and logging have process-wide state. For ERP, set `purpose="erp"`, the appropriate `task_name`, and supply each recording's events inside its worker, as in the task example above.
+`--workers` defaults to 1 and controls concurrent recordings; every worker uses `n_threads=1` and sets numerical thread variables before importing EEG libraries. `--timeout` defaults to 86400 seconds per recording; a timed-out worker and its report child processes are terminated together. Start with one or two workers and measure peak memory before increasing concurrency. Inspect both processing and report status in `batch_summary.json`. Ctrl+C stops active worker trees, cancels queued rows and saves the recovery summary. A small `batch_result.json` per recording supports recovery; failed attempts retain logs and report material. Completed reports remove their batch-generated package and worker log.
 
 ## Workflow and outputs
 

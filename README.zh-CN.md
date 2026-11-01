@@ -75,57 +75,25 @@ render_report(seg, "outputs/sub01_epochs/sub01_report.html")
 epochs = seg.epochs
 ```
 
-`run()` 和 `epoch()` 均默认 `report=True`。设为 `report=False` 时，处理过程中不绘图、不写 HTML，只保存一个 `*_report_data.npz`，供后续生成报告；不复制整份原始 Raw。`render_report()` 可接收结果对象、已有 HTML 或报告数据包。
+`run()`、`epoch()`、`resume()` 均默认 `report=True`，报告交给全新子进程绘制。`report=False` 时不绘图、不写 HTML，只保存一个 `*_report_data.npz`，供后续生成报告。eegproc 的数值采集模块不主动导入 Agg 或字体渲染组件；MNE 自身的操作仍可能导入 Matplotlib。不复制整份原始 Raw。`render_report()` 可接收结果对象、已有 HTML 或报告数据包，并使用相同的隔离渲染方式。报告状态区分 `completed`、`partial`、`failed` 和 `deferred`，与处理状态分开；报告不完整时保留有限素材和错误日志供恢复。
 
 `epoch()` 从清理后 Raw/FIF 读取 BAD 来源和全局坏导信息。原有、人工及未知来源 BAD 继续参与拒绝；事件窗质控只重新检查明确标记的自动残留。程序自动查找此前的 HTML 或报告包，也可通过 `source_report="path/to/report.html"` 手动指定。报告缺失或无法读取时提醒，并生成独立分段报告。默认保留原 HTML，详见[独立分段与报告](docs/zh-CN/usage.md#独立分段)。
 
 命令行入口为 `eegproc-epoch` 和 `eegproc-report`。[epoch_and_report.py](examples/epoch_and_report.py) 提供完整的生成数据示例。
 
-## 并行处理
+## 批量与并行处理
 
-支持使用独立进程同时处理多份记录。`max_workers` 决定同时处理的记录数；`n_threads` 限制单份记录中受支持的数值库线程池，不会自动启动批处理任务。仓库中的 CSV 批处理示例仍按顺序运行。
+[CSV 批处理示例](examples/batch_process.py) 为每份记录启动全新进程。父进程记录普通异常、进程意外退出和超时，其余记录继续处理。报告在 EEG 结果保存完成后，通过独立子进程生成。
 
-将以下代码单独保存为 `parallel_preprocess.py`，在终端执行 `python parallel_preprocess.py`：
-
-```python
-import os
-
-# 在导入 NumPy、MNE 或 PyTorch 前设置。
-for name in ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS"):
-    os.environ[name] = "1"
-
-from concurrent.futures import ProcessPoolExecutor
-from multiprocessing import get_context
-from pathlib import Path
-
-
-def process_one(job):
-    recording_id, input_fif = job
-    import mne
-    from eegproc import run
-
-    with mne.io.read_raw_fif(input_fif, preload=False, verbose=False) as raw:
-        result = run(
-            raw, Path("outputs_parallel") / recording_id, recording_id,
-            purpose="rest", task_name="eyes_closed", n_threads=1,
-        )
-        return (recording_id, result.status, result.report.get("report_status"),
-                result.outputs["quality_report"])
-
-
-if __name__ == "__main__":
-    jobs = [
-        ("sub01_rest", "prepared/sub01_raw.fif"),
-        ("sub02_rest", "prepared/sub02_raw.fif"),
-    ]
-    with ProcessPoolExecutor(max_workers=2, mp_context=get_context("spawn")) as pool:
-        for recording_id, status, report_status, html in pool.map(process_one, jobs):
-            print(f"{recording_id}: {status}; report={report_status}; {html}")
+```bash
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2
+# 中断或报告失败后，继续同一批次：
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-worker 函数应定义在模块顶层，并保留 `__main__` 保护；请作为 `.py` 脚本运行，不直接放入 Notebook 单元格（参见 [Python 进程池要求](https://docs.python.org/3/library/concurrent.futures.html#concurrent.futures.ProcessPoolExecutor)）。各 `recording_id` 必须唯一，每份记录都要使用独立的**新输出目录**；同一受试者的不同任务或 session 也需区分。向子进程传文件路径，只返回简短状态和报告路径，避免跨进程传递 Raw 或 PipelineResult 大对象。
+清单与目录格式见[完整使用教程](docs/zh-CN/usage.md#可执行示例)。恢复时保持清单各行不变。已完成的记录跳过；延迟、缺图或失败的报告仅从保存素材重试，不重复预处理。科学处理失败或输出不完整时，解决原因后使用新输出目录重新处理，示例不会自动重跑科学计算。
 
-建议先用两个进程、每次 `n_threads=1`，再根据内存增加进程数；每个进程仍会加载完整记录及处理缓冲。环境变量用于减少嵌套数值线程；`n_threads` 不保证整个进程严格只有指定数量的线程。绘图和日志具有进程级状态，因此并发调用流程时使用独立进程。用于 ERP 时，在 worker 中设置 `purpose="erp"`、相应 `task_name`，并按前面的任务示例传入该记录的事件。
+`--workers` 默认为 1，控制同时处理的记录数；每个 worker 使用 `n_threads=1`，并在导入 EEG 库前设置数值线程环境。`--timeout` 默认每份记录 86400 秒，超时会一并终止该 worker 及其报告子进程。建议从一至两个 worker 开始，测量内存峰值后再增加。请同时检查 `batch_summary.json` 中的处理状态与报告状态。Ctrl+C 会终止活动 worker 树、取消排队记录，并保存恢复摘要；每份记录的简短 `batch_result.json` 用于恢复。失败尝试保留日志和报告素材，完整报告生成后删除批处理自建的素材包和 worker 日志。
 
 ## 流程与输出
 

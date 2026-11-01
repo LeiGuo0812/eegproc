@@ -62,15 +62,16 @@ def prohibit_processing(monkeypatch):
         monkeypatch.setattr(module,name,forbidden)
 
 
-def test_legacy_html_rebuild_reuses_images_diagnostics_and_current_layout(tmp_path,monkeypatch,prohibit_processing):
+def test_legacy_html_rebuild_reuses_images_diagnostics_and_current_layout(tmp_path,prohibit_processing):
     import eegproc.quality_report as reporting
     source,old,details=legacy_report(tmp_path)
     originals={path:path.read_bytes() for path in tmp_path.iterdir()}
-    monkeypatch.setattr(reporting,'CSS',reporting.CSS+'\n/* current-layout-marker */')
     target=render_report(source,tmp_path/'updated_report.html')
     assert target==tmp_path/'updated_report.html'
     document=target.read_text(encoding='utf8')
-    assert 'current-layout-marker' in document
+    # Rendering loads the current package in a fresh interpreter. Parent-only
+    # monkeypatches must not be propagated into the isolated worker.
+    assert reporting.CSS in document
     rebuilt=_read_html(target)
     old=json.loads(json.dumps(old))
     for key in ('config','ica','ica_checkpoint','qc_annotations','metadata_audit','provenance','epochs'):

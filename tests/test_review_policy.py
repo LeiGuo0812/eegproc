@@ -61,9 +61,12 @@ def test_above_threshold_finishes_preserves_metadata_and_writes_review(tmp_path,
         assert any(b['description']==a['description'] and b['onset']==a['onset'] for b in clean.annotations)
     page=tmp_path/'review_report.html'
     assert page.exists() and 'Completed with observations' in page.read_text(encoding='utf8')
+    original_page=page.read_bytes()
     # Final CLI report update must include epoch counts, not the earlier continuous-only report.
     report['epochs']={'input_events':10,'retained_epochs':4,'condition_retention':{'1':{'input':10,'retained':4}}}
-    save_quality_report(report,report['outputs']['quality_report'])
-    assert '4 / 10' in page.read_text(encoding='utf8')
-    saved=read_report((tmp_path/'review_report.html').read_text(encoding='utf8'))
+    updated=tmp_path/'review_epochs_report.html'
+    save_quality_report(report,updated)
+    assert page.read_bytes()==original_page
+    assert '4 / 10' in updated.read_text(encoding='utf8')
+    saved=read_report(updated.read_text(encoding='utf8'))
     assert saved['human_review']['decision']=='pending' and saved['epochs']['retained_epochs']==4

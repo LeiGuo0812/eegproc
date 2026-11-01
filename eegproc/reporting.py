@@ -118,16 +118,22 @@ def _check_record(report):
         raise ValueError('Source does not contain complete ICA component diagnostics')
 
 
+def _available_report_path(outputs):
+    return next((path for path in (outputs.get('report_data'), outputs.get('quality_report'))
+                 if path and Path(path).is_file()), None)
+
+
 def read_report_source(source):
     """Read a result, HTML or report-data archive without reading EEG files."""
     from .api import PipelineResult
     if isinstance(source, PipelineResult):
         report = deepcopy(source.report)
         outputs = report.get('outputs', {})
-        path = outputs.get('report_data') or outputs.get('quality_report')
+        path = _available_report_path(outputs)
         figures = report.get('visualizations', {}).get('figures', [])
         missing = any(not figure.get('data_uri') for figure in figures)
-        if path and (missing or (report.get('report_status') == 'deferred' and 'report_materials' not in report)):
+        if path and (missing or (report.get('report_status') in ('deferred','partial','failed')
+                                and 'report_materials' not in report)):
             return read_report_source(path)
         return report
     if not isinstance(source, (str, PathLike)):
@@ -140,12 +146,8 @@ def read_report_source(source):
 
 
 def emit_report(record, path, *, generate=True, original=None, clean=None, ica=None, training=None):
-    """Write HTML now, or collect numeric display material for later plotting."""
-    from .quality_report import safe_report
+    """Collect numeric material; render in a new process or save for later."""
     target = Path(path).resolve()
-    if generate:
-        record.setdefault('outputs', {}).pop('expected_report', None)
-        return safe_report(record, target, original=original, clean=clean, ica=ica, training=training)
     outputs = record.setdefault('outputs', {})
     outputs.pop('quality_report', None)
     outputs['expected_report'] = str(target)
@@ -156,10 +158,13 @@ def emit_report(record, path, *, generate=True, original=None, clean=None, ica=N
     record['report_status'] = 'deferred'
     try:
         if original is not None and clean is not None:
-            from .quality_figures import collect_report_materials
+            from .report_materials import collect_report_materials
             from .report_provenance import capture_signal_audit
             record['report_materials'] = collect_report_materials(record, original, clean, ica, training)
             capture_signal_audit(record, original, clean)
+        if generate:
+            from .report_process import render_in_subprocess
+            return render_in_subprocess(record,target)
         outputs['report_data'] = str(bundle)
         from .report_data import save_report_data
         save_report_data(record, bundle)
@@ -168,6 +173,9 @@ def emit_report(record, path, *, generate=True, original=None, clean=None, ica=N
         outputs.pop('report_data', None)
         record['report_status'] = 'failed'
         record['report_error'] = dict(type=type(exc).__name__, message=str(exc))
+        if generate:
+            from .report_process import _preserve_failure
+            _preserve_failure(record,target,'Report material collection failed: '+str(exc))
         return False
 
 
@@ -180,7 +188,7 @@ def render_report(source, report_path: str | PathLike[str]) -> Path:
     unchanged. Waveform windows and other plot settings cannot be changed here.
     """
     from .api import PipelineResult
-    from .quality_report import safe_report
+    from .report_process import render_in_subprocess
     from .report_provenance import file_hash, utc_now
     from . import __version__
 
@@ -191,8 +199,8 @@ def render_report(source, report_path: str | PathLike[str]) -> Path:
         raise FileExistsError('Report target already exists; choose a new HTML path')
     source_path = None
     if isinstance(source, PipelineResult):
-        path = source.report.get('outputs', {}).get('report_data') or source.report.get('outputs', {}).get('quality_report')
-        if path and Path(path).is_file():
+        path = _available_report_path(source.report.get('outputs', {}))
+        if path:
             source_path = Path(path).resolve()
         report = read_report_source(source)
     elif isinstance(source, (str, PathLike)):
@@ -218,13 +226,15 @@ def render_report(source, report_path: str | PathLike[str]) -> Path:
     if prior:
         report['report_generation']['previous_generation'] = prior
     report.setdefault('outputs', {}).pop('expected_report', None)
-    if not safe_report(report,target,reuse_figures=not deferred):
+    if not render_in_subprocess(report,target,reuse_figures=not deferred,source_path=source_path):
         error = report.get('report_error', {}).get('message', 'unknown rendering error')
-        raise RuntimeError('Report rendering failed: '+error)
+        log = report.get('outputs',{}).get('report_log')
+        raise RuntimeError('Report rendering failed: '+error+(f'; log: {log}' if log else ''))
     epoching = report.get('epoching', {})
     previous = epoching.get('source_report')
     if (previous and epoching.get('keep_source_report', True) is False
-            and report.get('status') in ('completed', 'review_required')):
+            and report.get('status') in ('completed', 'review_required')
+            and report.get('report_status') == 'completed'):
         old = Path(previous).resolve()
         if old.suffix.lower() == '.html' and old != target and old.is_file():
             try:

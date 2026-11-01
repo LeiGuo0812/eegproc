@@ -64,8 +64,13 @@ def test_report_cli_uses_the_same_renderer(monkeypatch, tmp_path, capsys):
     calls = []
     def render(source, output):
         calls.append((source, output))
+        Path(output).write_text('<html><script id="run-record" type="application/json">'+
+            json.dumps(dict(status='completed',config={},report_status='partial',
+                            processing_status='completed'))+'</script></html>',encoding='utf-8')
         return Path(output)
     monkeypatch.setattr(eegproc.api, 'render_report', render)
     main(['--source', 'subject_report_data.npz', '--output', str(tmp_path/'report.html')])
     assert calls == [('subject_report_data.npz', str(tmp_path/'report.html'))]
-    assert json.loads(capsys.readouterr().out)['status'] == 'completed'
+    summary = json.loads(capsys.readouterr().out)
+    assert summary['status'] == 'partial'
+    assert summary['processing_status'] == 'completed'

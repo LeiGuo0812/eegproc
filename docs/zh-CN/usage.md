@@ -28,10 +28,17 @@ sub01,prepared/sub01_task_raw.fif,erp,oddball,prepared/sub01_task_raw.events.jso
 ```
 
 ```bash
-python examples/batch_process.py manifest.csv --output outputs/cohort
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-清单中的路径相对于清单文件，每一行使用独立输出目录。检查 `batch_summary.json`：某条记录失败会被记下，其他记录继续处理。[模拟示例](../../examples/synthetic_demo.py)和[后续分析脚本](../../examples/analyze_outputs.py)也可直接阅读，作为完整 API 用法参考。
+清单路径相对于清单文件，每一行使用独立的 `recording_0001/` 目录。父进程为每份记录启动全新 Python 进程，普通异常、worker 意外退出或超时不影响后续记录。`--workers` 默认为 1，建议从一至两个开始并测量内存峰值；每个 worker 使用 `n_threads=1`。`--timeout` 默认每份记录 86400 秒，超时会一并终止该 worker 及其报告子进程。
+
+worker 在渲染前先保存 EEG 结果和简短的 `batch_result.json` 恢复记录。每条完成后原子更新 `batch_summary.json`，分别记录处理和报告状态。完整报告生成后删除批处理自建的素材包及 worker 日志；报告失败或部分完成时保留素材、日志，不将已完成的 EEG 改为处理失败。
+
+`--resume` 使用**相同清单各行和输出目录**。完整报告直接跳过；延迟、部分完成或失败的报告从 NPZ 生成到新目标，不加载或重做 EEG。此前失败的科学处理仍记录失败，不自动重复；解决原因后使用新输出目录有意重跑。已有不完整文件、但没有恢复记录的目录同样保持原样。只要仍有处理或报告需关注，批量命令就返回非零退出码。Ctrl+C 会终止活动 worker 树、取消排队记录，并保存恢复摘要。
+
+[模拟示例](../../examples/synthetic_demo.py)和[后续分析脚本](../../examples/analyze_outputs.py)也可直接阅读，作为完整 API 用法参考。
 
 ## 输入要求与数据准备
 
@@ -212,11 +219,11 @@ fixed = epoch(
 
 `source_report=None` 先查找已读取 `*_cont_raw.fif` 同目录同前缀的 `*_report.html` 或 `*_report_data.npz`，再使用预处理 API 保存的报告路径提示。也可通过 `source_report="outputs/sub01/sub01_report.html"` 手动指定。报告缺失或无法读取时提醒，不阻止分段；已有图像和 ICA 诊断直接复用，只生成新的分段内容。程序不核验报告归属，请选择对应文件。
 
-默认 `keep_source_report=True` 保留原 HTML。设为 `False` 时，仅在新的合并 HTML 成功写入后删除旧 HTML，延迟模式不提前删除。输出仅为保留的分段 FIF 和一个 HTML 或报告包，不生成 QC JSON、图片／表格附件，不复制连续 Raw 或 ICA。分段请求被跳过或全部拒绝时报告原因，不写空分段文件。
+默认 `keep_source_report=True` 保留原 HTML。设为 `False` 时，仅在新合并 HTML 的 `report_status="completed"` 后删除旧 HTML；部分完成、失败或延迟时保留来源。输出仅为保留的分段 FIF 和一个 HTML 或报告包，不生成 QC JSON、图片／表格附件，不复制连续 Raw 或 ICA。分段请求被跳过或全部拒绝时报告原因，不写空分段文件。
 
 ## 即时与延迟报告
 
-`run()` 和 `epoch()` 均默认 `report=True`。设为 `report=False` 时，处理过程中只采集有限诊断数据，不绘图、不写 HTML，以一个 `*_report_data.npz` 替代即时 HTML。包中包含代表性处理前后波形、频谱摘要、ICA 诊断和 QC 记录，不含整份原始记录。
+`run()`、`epoch()`、`resume()` 均默认 `report=True`。处理进程先采集有限诊断素材，再交给全新 Python 子进程生成 HTML；数值线程环境在子进程导入库之前设置。`report=False` 时只写一个 `*_report_data.npz`，不绘图、不写 HTML。包中包含代表性处理前后波形、频谱摘要、ICA 诊断和 QC 记录，不含整份原始记录。eegproc 的数值采集模块不主动导入 Agg 或字体渲染组件；MNE 自身的操作仍可能导入 Matplotlib。
 
 ```python
 from eegproc import run, epoch, render_report
@@ -241,7 +248,13 @@ render_report(
 )
 ```
 
-目标 HTML 必须为新文件。生成报告不会重跑预处理或分段质控，可绘制已保存的诊断素材，但无法恢复从未采集的原始时间窗。`report_status="deferred"` 表示有意延迟 HTML；即时报告不会额外生成报告包。
+目标 HTML 必须为新文件。生成报告不会重跑预处理或分段质控，可绘制已保存的诊断素材，但无法恢复从未采集的时间窗。已有 HTML 通过相同的隔离路径复用内嵌图片，来源文件保持不变。
+
+`report_status` 与 `result.status` 分开：`completed` 表示所有适用内容生成完成；`partial` 表示已有 HTML，但存在缺失内容或绘图错误；`failed` 表示报告生成未完成；`deferred` 表示主动延迟 HTML。关闭 ICA 等不适用的内容不计为错误。运行后检查 `result.report["report_status"]`，不要把有无 HTML 用作 EEG 接受或排除规则。
+
+渲染器最多尝试两个全新进程，每次限时 300 秒。意外退出和超时记入 `report_execution`；报告不完整时保留 `outputs["report_data"]` 和 `outputs["report_log"]` 供重试。完整的即时报告会清理临时包和日志。`render_report()` 对完整或部分完成的 HTML 返回路径，生成失败时抛出 `RuntimeError`；仅报告失败不会让 `run()`、`epoch()`、`resume()` 丢失已完成的处理结果。重试素材包时使用新目标文件。进程隔离能够保护调用方免受渲染进程退出影响，不能防止操作系统崩溃。
+
+单份记录的处理进程会与其报告进程短暂共存。选择批量并发数时，应计入额外内存与进程启动开销。
 
 `run()`、`epoch()`、`resume()` 使用相同结果字段：`.raw`、`.epochs`、`.report`、`.outputs`、`.status`。不存在的数据产物为 `None`；整段流程的 `.epochs` 可按需读取已保存 FIF，独立分段通过同一属性返回本次得到的 Epochs。`render_report()` 返回 HTML 路径。[完整生成数据示例](../../examples/epoch_and_report.py) 包含 FIF 重新读取和两阶段延迟报告。
 
@@ -349,7 +362,7 @@ revised = resume(
 
 ## 批处理与内存
 
-先逐个处理受试者，了解实际内存峰值：
+短时交互检查可先逐个处理受试者，了解实际内存峰值；无人值守或需要恢复的批次使用前述带监督的 CSV 示例：
 
 ```python
 from pathlib import Path
@@ -363,7 +376,8 @@ for path in sorted(Path("prepared").glob("*_raw.fif")):
     result = run(raw, Path("outputs") / subject, subject,
                  purpose="rest", task_name="eyes_closed", n_threads=1)
     summaries.append({"subject": subject, "status": result.status,
-                      "report": result.outputs["quality_report"]})
+                      "report_status": result.report["report_status"],
+                      "report": result.outputs.get("quality_report")})
     del result
     raw.close()
 ```

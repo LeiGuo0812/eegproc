@@ -28,10 +28,17 @@ sub01,prepared/sub01_task_raw.fif,erp,oddball,prepared/sub01_task_raw.events.jso
 ```
 
 ```bash
-python examples/batch_process.py manifest.csv --output outputs/cohort
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2
+python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-Manifest paths are relative to the manifest, and each row receives its own output directory. Inspect `batch_summary.json`: individual failures are recorded while remaining rows continue. The [synthetic demo](../../examples/synthetic_demo.py) and [downstream analysis script](../../examples/analyze_outputs.py) can also be imported/read as complete API examples.
+Manifest paths are relative to the manifest, and each row receives its own `recording_0001/` directory. A parent supervisor starts a fresh Python process per recording, so an ordinary exception, unexpected worker exit or timeout does not break a reusable process pool or stop the remaining rows. `--workers` defaults to 1; start with one or two and measure peak memory. Each worker uses `n_threads=1`. `--timeout` defaults to 86400 seconds per recording; a timed-out worker and its report child processes are terminated together.
+
+The worker saves EEG results and a small `batch_result.json` recovery record before rendering. `batch_summary.json` is updated atomically after each result, with processing and report status recorded separately. Successful rendering removes the batch-generated report package and worker log. Failed or partial rendering preserves material and logs, without turning completed EEG into a failed recording.
+
+Use `--resume` with the **same manifest rows and output directory**. Completed reports are skipped; deferred, partial or failed reports are regenerated from their NPZ in a fresh target, without loading or reprocessing EEG. Previously failed scientific processing is recorded but not automatically repeated; resolve its cause and use a new output directory for a deliberate rerun. A directory with incomplete files but no recovery record is also left untouched. The batch command returns a nonzero exit code if any processing or report still needs attention. Ctrl+C stops active worker trees, cancels queued rows and saves the recovery summary.
+
+The [synthetic demo](../../examples/synthetic_demo.py) and [downstream analysis script](../../examples/analyze_outputs.py) can also be imported/read as complete API examples.
 
 ## Input contract and data preparation
 
@@ -212,11 +219,11 @@ New continuous FIFs retain minimal BAD-origin information and epoch settings. Or
 
 `source_report=None` looks beside a loaded `*_cont_raw.fif` for a matching `*_report.html` or `*_report_data.npz`, then uses the preprocessing API's report-path hint. Pass `source_report="outputs/sub01/sub01_report.html"` to select a source explicitly. Missing or unreadable reports warn without preventing epoching. Existing figures and ICA diagnostics are reused; only the new epoch content is generated. Select the correct report: no recording-identity matching is performed.
 
-Source HTML is kept by default (`keep_source_report=True`). With `keep_source_report=False`, it is deleted only after a new combined HTML is written successfully, never while reporting is deferred. Outputs are retained epoch FIF plus one HTML or report package; there are no QC JSON, image/table sidecars or copies of continuous Raw/ICA. Skipped or all-rejected requests are reported without writing an empty epoch file.
+Source HTML is kept by default (`keep_source_report=True`). With `keep_source_report=False`, it is deleted only after the new combined HTML has `report_status="completed"`; partial, failed or deferred reports keep the source. Outputs are retained epoch FIF plus one HTML or report package; there are no QC JSON, image/table sidecars or copies of continuous Raw/ICA. Skipped or all-rejected requests are reported without writing an empty epoch file.
 
 ## Immediate and delayed reports
 
-`run()` and `epoch()` default to `report=True`. With `report=False`, processing collects bounded diagnostic data without drawing figures or writing HTML. One `*_report_data.npz` replaces the immediate HTML. It contains representative before/after waveform windows, spectrum summaries, ICA diagnostics and QC records, not a full original recording.
+`run()`, `epoch()` and `resume()` default to `report=True`. Processing first captures bounded diagnostic material, then a fresh Python subprocess renders HTML with numerical threads limited before import. `report=False` saves one `*_report_data.npz` without drawing or HTML. It contains representative before/after waveform windows, spectrum summaries, ICA diagnostics and QC records, not a full original recording. The eegproc material collector does not actively import Agg or font-rendering components; upstream MNE operations may independently import Matplotlib.
 
 ```python
 from eegproc import run, epoch, render_report
@@ -241,7 +248,13 @@ render_report(
 )
 ```
 
-The target HTML must be new. Rendering does not repeat preprocessing or epoch QC. Stored diagnostics can be drawn later, but original intervals that were never captured cannot be recovered. `report_status="deferred"` means HTML was intentionally postponed. Immediate reports do not create an additional report-data package.
+The target HTML must be new. Rendering does not repeat preprocessing or epoch QC. Stored diagnostics can be drawn later, but intervals that were never captured cannot be recovered. Existing HTML reuses embedded figures in the same isolated rendering path. The source remains unchanged.
+
+`report_status` is independent of `result.status`: `completed` means all applicable sections rendered; `partial` means HTML exists with missing sections or plotting errors; `failed` means rendering did not finish; `deferred` means HTML was intentionally postponed. Missing optional sections such as ICA when disabled do not count as errors. Inspect `result.report["report_status"]` after processing; do not use HTML availability as an EEG acceptance rule.
+
+A renderer gets at most two fresh-process attempts, each limited to 300 seconds. Unexpected exits and timeouts are recorded in `report_execution`; incomplete delivery retains `outputs["report_data"]` and `outputs["report_log"]` for retry. Successfully completed immediate reports remove their temporary package and log. `render_report()` returns the path for complete or partial HTML and raises `RuntimeError` on rendering failure; `run()`, `epoch()` and `resume()` retain their processing result when only reporting fails. Retry a saved package to a new target. Process isolation protects the caller from a renderer exit; it cannot protect a computer from an operating-system crash.
+
+A recording worker can briefly coexist with its report worker. Account for the extra memory and process startup time when choosing batch concurrency.
 
 `run()`, `epoch()` and `resume()` use the same result fields: `.raw`, `.epochs`, `.report`, `.outputs` and `.status`. Missing data products are `None`. Integrated runs can load saved epochs on demand through `.epochs`; standalone `epoch()` exposes its computed Epochs through the same attribute. `render_report()` returns the HTML path. The [complete generated-data example](../../examples/epoch_and_report.py) includes FIF read-back and both deferred reports.
 
@@ -349,7 +362,7 @@ Keep all three checkpoint files and the original prepared input. File-backed inp
 
 ## Batch processing and memory
 
-Process subjects sequentially until actual memory use is known:
+For a short interactive memory check, process subjects sequentially. For an unattended or resumable cohort, use the supervised CSV example above:
 
 ```python
 from pathlib import Path
@@ -363,7 +376,8 @@ for path in sorted(Path("prepared").glob("*_raw.fif")):
     result = run(raw, Path("outputs") / subject, subject,
                  purpose="rest", task_name="eyes_closed", n_threads=1)
     summaries.append({"subject": subject, "status": result.status,
-                      "report": result.outputs["quality_report"]})
+                      "report_status": result.report["report_status"],
+                      "report": result.outputs.get("quality_report")})
     del result
     raw.close()
 ```

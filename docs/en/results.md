@@ -19,7 +19,7 @@ outputs/sub01/
 
 Optional retained epochs add `sub01_clean-epo.fif`. If all trials are rejected, no empty epoch FIF is written. Review mode produces the HTML and three checkpoint files; it has not yet produced a final cleaned recording. ICA-disabled runs produce neither ICA model nor checkpoint. Continuation reuses the parent checkpoint and writes a new result family. Large FIF files may split into numbered parts; retain every part in the output inventory.
 
-With `report=False`, `sub01_report_data.npz` replaces the immediate HTML. It stores bounded plot data and QC records; `render_report()` draws them later without repeating preprocessing. An immediate-report run does not also save this package. A standalone epoch run contains only `sub01_clean-epo.fif` when trials remain and one report HTML or package; it does not copy the continuous recording or ICA checkpoint.
+With `report=False`, `sub01_report_data.npz` replaces the immediate HTML. It stores bounded plot data and QC records; `render_report()` draws them later without repeating preprocessing. A complete immediate-report run does not retain its temporary package. Incomplete rendering retains recovery material and a log. A standalone epoch run contains only `sub01_clean-epo.fif` when trials remain and one report HTML or package; it does not copy the continuous recording or ICA checkpoint.
 
 There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or image/table sidecar. Keep the prepared input separately because ICA continuation verifies that input. Standalone epoching needs only the cleaned Raw/FIF, which carries BAD origins and the original global bad-channel list. `pre_ica_raw.fif` is a recovery point **before IC subtraction**, not the unfiltered recording or a copy from before all preprocessing.
 
@@ -33,6 +33,17 @@ There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or im
 Processing, delivery and report-generation status are also recorded separately. A usable FIF can exist even if a later report or epoch stage fails. A report existing on disk does not guarantee every requested stage completed.
 
 `report_status="deferred"` means reporting was deliberately postponed; use the saved report-data package to generate HTML. A standalone epoch request without usable events has a skipped epoch resolution; an all-rejected request has zero retained trials and no epoch FIF. In both cases, the HTML or package records the reason. `.epochs` exposes the epoch result, while `.outputs` lists only files actually produced.
+
+`report_status` describes presentation independently of EEG processing:
+
+| Report status | Meaning | Follow-up |
+|---|---|---|
+| `completed` | All applicable report sections were generated | Review the data using the study criteria. |
+| `partial` | HTML exists, with missing sections or plotting errors | Read the displayed errors and retry from the retained package. |
+| `failed` | Rendering exited, timed out or could not commit HTML | Use the retained package/log to retry to a fresh target. |
+| `deferred` | HTML was deliberately postponed | Call `render_report()` when needed. |
+
+Rendering runs in a fresh subprocess, with at most two attempts of 300 seconds. The data result remains available when only rendering fails. Incomplete rendering retains a compact `*_report_data.npz` and `*_report_errors.log`; complete immediate reports remove temporary rendering files. A `render_report()` source package is kept unchanged. Inspect `report_execution` for attempts and exit codes. Batch runs also write `batch_summary.json` and a small per-recording `batch_result.json` for recovery; these are not extra algorithm-stage snapshots.
 
 ## Read the report in this order
 
