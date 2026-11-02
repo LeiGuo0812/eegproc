@@ -278,6 +278,10 @@ print(resolved.adjustments)
 
 当分析和 ICA 训练频段均为 1–100 Hz 时，流程复用全程频段数据缓冲；算法工作数组和提取有效训练片段仍可能占用额外内存。仅修改分析频段，不会自动把 ICA 训练频段改成相同值。
 
+`standard` 和 `eeglab` 在静息态、ERP 下均默认请求 **1–100 Hz 的 ICA 训练频段**。`eeglab` 保留 0.5–100 Hz 的分析默认值和其他近似对齐设置，但 ICA 训练高通采用 1 Hz，而非原脚本的 0.5 Hz。坏导检测复用训练频段副本，因此默认检测频段也为 1–100 Hz。这个选择遵循 [ICLabel 的预处理建议](https://mne.tools/mne-icalabel/stable/generated/examples/00_iclabel.html)；仅带宽相同并不代表已经匹配分类器训练的全部条件。
+
+仍可通过 `training_highpass`、`training_lowpass` 显式自定义。输入既有滤波和 Nyquist 限制优先，调整会写入报告；请求 1–100 Hz 无法恢复采集时已丢失或被滤掉的频率。已有 ICA 断点沿用其记录的实际训练频段，`resume()` 复用原分解。若要把旧的 0.5 Hz 分解改为 1 Hz 分解，需要从准备好的 Raw 重新预处理。
+
 需要配置文件时，可把 JSON 作为基础：
 
 ```python

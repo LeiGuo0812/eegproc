@@ -60,6 +60,10 @@ PACKAGED_V040A3_SOURCE_SHA256 = VERIFIED_EPOCH_TARGET_SHA256
 # Report-only transition checked against the frozen 0.4.0a3 source, including
 # bitwise rest/ERP comparisons and continuation without repeating ICA fitting.
 VERIFIED_REPORT_TARGET_SHA256 = '2dcf79c70d3e7ddb457d82db0f95f59f298d0a69f1f1ebe5f7202d839fc0a6d3'
+PACKAGED_V040A4_SOURCE_SHA256 = VERIFIED_REPORT_TARGET_SHA256
+# Existing decompositions retain their complete stored configuration. This
+# transition never refits an old 0.5 Hz decomposition as a new 1 Hz one.
+VERIFIED_ICA_BAND_TARGET_SHA256 = 'a929b0b05ce933c05ddb6d9531fe7cead33360f55e5ffe8c54e186299be06d67'
 LEGACY_V2_SOURCE_FILES = {
     "eeg_pipeline/_utils.py": "560369b76e2d1d91fa79f4cf5c23daae093a3c2acbbdb48ed1b3deacde229d4a",
     "eeg_pipeline/backends.py": "6baa4dd3ddafebed91086a1f1be88909eec963e91e7919cced05484c9b00e218",
@@ -125,6 +129,8 @@ def _verified_transitions():
     """Only explicit source/target pairs; no version-wide compatibility bypass."""
     legacy=_bundle(LEGACY_V2_SOURCE_FILES)
     result={}
+    if VERIFIED_ICA_BAND_TARGET_SHA256:
+        result[(PACKAGED_V040A4_SOURCE_SHA256,VERIFIED_ICA_BAND_TARGET_SHA256)]='verified-0.4.0a4-to-ica-training-defaults'
     if VERIFIED_REPORT_TARGET_SHA256:
         result[(PACKAGED_V040A3_SOURCE_SHA256,VERIFIED_REPORT_TARGET_SHA256)]='verified-0.4.0a3-to-isolated-reports'
     if VERIFIED_EPOCH_TARGET_SHA256:

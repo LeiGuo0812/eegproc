@@ -207,11 +207,12 @@ flowchart TB
 
 With `epoch_qc="auto"`, event epochs use actual event-window QC and fixed epochs use continuous annotation rejection. Bounded repair is an alternative epoch path. Both preserve input BAD; the report includes per-condition retention and rejection reasons.
 
-- The standard common band is **0.5–100 Hz for rest** and **0.1–100 Hz for ERP**. Line cleaning occurs before this filter and before ASR, not only on the final low-pass output.
+- The standard common band is **0.5–100 Hz for rest** and **0.1–100 Hz for ERP**. The `eeglab` common band remains **0.5–100 Hz** for both purposes. Line cleaning occurs before this filter and before ASR, not only on the final low-pass output.
+- Both presets request **1–100 Hz ICA training**. The analysis branch retains its own band; training overrides remain available, and acquisition limits can narrow the effective band. These adjustments are recorded in the report.
 - If analysis and ICA training bands are identical, for example **1–100 Hz**, they share the full-record band buffer. Selecting valid training samples and numerical algorithm work can still require other arrays.
 - ASR never calibrates or carries state across input BAD/boundary spans. Segments shorter than the configured minimum are skipped and reported. `asr_cutoff=None` bypasses ASR.
 - Each eligible ASR segment independently selects reference data, calibrates and reconstructs. The default segment minimum is 20 seconds. The gross-artifact mask is for later ICA training exclusion, not an additional ASR exclusion mask.
-- Bad-channel detection uses a temporary training-band copy without input BAD/boundary samples. ICA training retains valid subsegments of at least 1 second and requires at least 20 seconds in total by default. Its bounded diagnostic preview remains in memory, not another Raw file.
+- Bad-channel detection uses a temporary training-band copy without input BAD/boundary samples, defaulting to **1–100 Hz in both presets**. ICA training retains valid subsegments of at least 1 second and requires at least 20 seconds in total by default. Its bounded diagnostic preview remains in memory, not another Raw file.
 - Optional `interpolate_before_asr=True` changes the bad-channel handling at that point. Reference/interpolation switches remain effective; `reference="unchanged"` also prevents reference changes at the final stage.
 - With the default `threshold` rule, Heart-only ICLabel candidates require ECG correlation when usable ECG exists; otherwise ICLabel alone is used. `class_max` uses the original category rule without ECG assistance.
 - Event-window QC preserves all input BAD annotations, including manual labels and any pre-existing `BAD_residual`. It reevaluates only `BAD_residual` added by this run on the actual requested trial. The continuous output keeps those annotations. Optional bounded epoch repair changes epochs only.

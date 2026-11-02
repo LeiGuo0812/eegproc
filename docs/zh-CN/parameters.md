@@ -29,7 +29,7 @@ print(config.adjustments)
 
 | 参数 | 类型 | 有效值 / 单位 | 说明 | standard/rest | standard/erp | eeglab/rest | eeglab/erp |
 |---|---|---|---|---|---|---|---|
-| `preset` | str | standard / eeglab | 同一流程的参数默认值；eeglab 近似对齐原脚本，不代表 MATLAB 数值复现。 | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
+| `preset` | str | standard / eeglab | 同一流程的参数默认值；两者均请求 1–100 Hz ICA 训练，eeglab 近似对齐原脚本的部分设置，不代表 MATLAB 数值复现。 | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
 | `filter_method` | str | mne_fir / eeglab_fir / off | 分析与训练数据的 FIR 实现；off 跳过显式带通滤波。 | `'mne_fir'` | `'mne_fir'` | `'eeglab_fir'` | `'eeglab_fir'` |
 | `filter_order` | int | even int ≥ 2; samples | 仅 eeglab_fir 使用；MNE FIR 自行确定滤波长度。 | `15000` | `15000` | `15000` | `15000` |
 | `filter_position` | str | after_reference | 目前仅支持在参考处理之后滤波。 | `'after_reference'` | `'after_reference'` | `'after_reference'` | `'after_reference'` |
@@ -59,8 +59,8 @@ print(config.adjustments)
 | `ica_backend` | str | mne | 支持的 ICA 接口；求解器由 ica_method 指定。 | `'mne'` | `'mne'` | `'mne'` | `'mne'` |
 | `highpass` | float | Hz > 0; < lowpass | 分析高通边缘，受已有采集滤波限制。 | `0.5` | `0.1` | `0.5` | `0.5` |
 | `lowpass` | float | Hz > highpass; < Nyquist | 分析低通边缘，必要时根据输入限制下调。 | `80.0` | `30.0` | `100.0` | `100.0` |
-| `training_highpass` | float | Hz > 0; < training_lowpass | ICA 训练高通边缘；分析与训练频段相同时复用滤波信号。 | `1.0` | `1.0` | `0.5` | `0.5` |
-| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA 训练低通边缘；ICLabel 标准训练频段为 1–100 Hz。 | `100.0` | `100.0` | `100.0` | `100.0` |
+| `training_highpass` | float | Hz > 0; < training_lowpass | ICA 训练高通边缘；所有预设默认 1 Hz。允许显式覆盖，受输入限制产生的调整会记录。 | `1.0` | `1.0` | `1.0` | `1.0` |
+| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA 训练低通边缘；所有预设默认 100 Hz。请求 1–100 Hz 无法恢复输入中不存在的频率。 | `100.0` | `100.0` | `100.0` | `100.0` |
 | `line_frequency` | float / None | Hz > 0 / None | 已知工频，通常为 50 或 60；处理不超过 min(100, sfreq/2−1) Hz 的谐波；None 关闭，不自动估计。 | `50.0` | `50.0` | `50.0` | `50.0` |
 | `artifact_threshold` | float | 0.5 ≤ probability ≤ 1 | 仅 threshold：肌电/眼电/心电/工频/通道噪声中最高概率的最低要求。 | `0.9` | `0.9` | `0.9` | `0.9` |
 | `brain_probability_max` | float | 0 ≤ probability ≤ 0.5 | 仅 threshold：删除时允许的 Brain 概率上限。 | `0.2` | `0.2` | `0.2` | `0.2` |

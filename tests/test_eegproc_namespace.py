@@ -29,7 +29,7 @@ def test_distribution_import_and_console_names_are_eegproc():
     assert metadata['project']['scripts']['eegproc'] == 'eegproc.cli:main'
     assert metadata['project']['scripts']['eegproc-prepare'] == 'eegproc.prepare_cli:main'
     assert metadata['project']['urls']['Repository'] == 'https://github.com/LeiGuo0812/eegproc'
-    assert eegproc.__version__ == '0.4.0a4'
+    assert eegproc.__version__ == '0.4.0a5'
 
 
 

@@ -112,6 +112,7 @@ jobs:
               'tests/test_report_materials.py', 'tests/test_report_isolation.py',
               'tests/test_deferred_report.py', 'tests/test_batch_recovery.py',
               'tests/test_report_checkpoint_compatibility.py',
+              'tests/test_ica_training_defaults.py', 'tests/test_ica_training_compatibility.py',
           ]
           targets = ['tests'] if os.environ['VALIDATION_TESTS'] == 'all' else base_tests
           subprocess.run([str(python), '-B', '-m', 'pytest', '-q', *targets], check=True)

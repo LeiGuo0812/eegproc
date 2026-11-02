@@ -116,10 +116,16 @@ def detect_channels(eeg,config):
         criteria=dict(flatline=sorted(flat),correlation=sorted(bads-flat),flatline_seconds=config.flatline_seconds,
             correlation_threshold=config.channel_correlation,noise_threshold='disabled',
             max_broken_fraction=config.channel_broken_fraction)
+    detection_band=[float(detection.info['highpass']),float(detection.info['lowpass'])]
     return sorted(existing|bads),dict(backend=config.channel_method,criteria=criteria,
-        existing_bad_samples_excluded=int(blocked.sum()),on_1_100_hz_copy=config.channel_method=='pyprep',
+        existing_bad_samples_excluded=int(blocked.sum()),detection_band_hz=detection_band,
+        on_1_100_hz_copy=detection_band==[1.,100.],
         omission_note='Input BAD/boundaries excluded; remaining samples concatenated only for channel detection')
 
 
 def alignment_notes(config):
-    return ['EEGLAB-derived filter, channel, rank and component-selection parameters; processing stages are shared with the standard preset.'] if config.preset=='eeglab' else []
+    if config.preset!='eeglab':return []
+    return ['EEGLAB-derived filter, channel, rank and component-selection parameters; processing stages are shared with the standard preset.',
+        f'ICA training follows the configured {config.training_highpass:g}–{config.training_lowpass:g} Hz band. '
+        'All presets share the nominal ICLabel-compatible 1–100 Hz training default; '
+        'the original script used a 0.5 Hz high-pass.']

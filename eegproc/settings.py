@@ -140,7 +140,7 @@ def _preset_defaults(purpose, preset):
     if purpose == 'erp':
         values.update(highpass=.1, lowpass=30.)
     if preset == 'eeglab':
-        values.update(highpass=.5, lowpass=100., training_highpass=.5, training_lowpass=100.,
+        values.update(highpass=.5, lowpass=100., training_highpass=1., training_lowpass=100.,
             filter_method='eeglab_fir', channel_method='eegprep', asr_cutoff=20.,
             ica_method='infomax', ica_max_iter=4096, rank_method='covariance', ica_rule='class_max')
     elif preset != 'standard':
@@ -185,5 +185,3 @@ def validate_config(config, sfreq):
         raise ValueError('Invalid ECG support threshold')
     if config.line_frequency is not None and (not np.isfinite(config.line_frequency) or config.line_frequency <= 0):
         raise ValueError('line_frequency must be positive or None')
-
-

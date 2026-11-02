@@ -278,6 +278,10 @@ print(resolved.adjustments)
 
 When analysis and ICA training are both 1–100 Hz, the workflow shares the full-record band buffer. Temporary algorithm buffers and the compact training data may still be needed. Changing only the analysis band does not change the requested ICA training band.
 
+Both `standard` and `eeglab` request ICA training at **1–100 Hz**, for rest and ERP alike. `eeglab` retains its 0.5–100 Hz analysis default and its other alignment settings; its ICA training high-pass is 1 Hz rather than the original script's 0.5 Hz. Bad-channel detection uses the training-band copy, so it also uses 1–100 Hz by default. This follows [ICLabel's preprocessing guidance](https://mne.tools/mne-icalabel/stable/generated/examples/00_iclabel.html); bandwidth alone does not establish equivalence to all classifier training conditions.
+
+`training_highpass` and `training_lowpass` can still be explicitly overridden. Input filter limits and Nyquist constraints take priority and are reported: a 1–100 Hz request cannot restore frequencies already removed or unavailable at acquisition. Existing ICA checkpoints retain their recorded training band; `resume()` reuses that decomposition. To replace an older 0.5 Hz fit with a 1 Hz fit, rerun preprocessing from the prepared Raw.
+
 An optional JSON file can supply a reusable base:
 
 ```python

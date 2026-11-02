@@ -17,11 +17,17 @@ from eegproc.settings import config_for
     ('erp','standard','5ab59a1d8e8fc3940430d5027939a03ebcbaf21ab3c8914e07625147cae3e8a1'),
     ('erp','eeglab','0eabe010e01c2c59ee7aec4af806c38c866df4d34507de29cebe0e59ab17f94a'),
 ])
-def test_all_original_preset_defaults_are_unchanged(purpose,preset,expected):
+def test_original_defaults_change_only_at_eeglab_ica_training_highpass(purpose,preset,expected):
     direct=PipelineConfig(purpose=purpose,preset=preset)
     factory=resolve_config(purpose=purpose,preset=preset)
     assert direct==factory==config_for(purpose,preset=preset)
-    digest=hashlib.sha256(json.dumps(asdict(factory),sort_keys=True).encode()).hexdigest()
+    values=asdict(factory)
+    if preset=='eeglab':
+        assert values['training_highpass']==1.
+        # Reinsert the one intentionally changed default before comparing
+        # against the frozen historical contract for every other field.
+        values['training_highpass']=.5
+    digest=hashlib.sha256(json.dumps(values,sort_keys=True).encode()).hexdigest()
     assert digest==expected
 
 
@@ -157,7 +163,7 @@ def test_incompatible_bands_fall_back_to_selected_preset_without_clamping():
     erp=resolve_config(purpose='erp',highpass=40.,lowpass=30.,artifact_threshold=.1)
     assert erp.highpass==.1 and erp.lowpass==30. and erp.artifact_threshold==.9
     eeglab=resolve_config(preset='eeglab',training_highpass=100.,training_lowpass=1.)
-    assert eeglab.training_highpass==.5 and eeglab.training_lowpass==100.
+    assert eeglab.training_highpass==1. and eeglab.training_lowpass==100.
 
 
 def test_audit_survives_config_merges_without_changing_dataclass_fields(tmp_path):

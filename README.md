@@ -57,6 +57,8 @@ erp = run(
 | Epoch export | When requested | When requested |
 | Report waveform window | 4 s | 4 s |
 
+All presets, including `eeglab`, request **1–100 Hz for ICA training**. Analysis bands remain separately configurable. The effective training band is limited by the input's existing filters and sampling frequency; any adjustment is recorded in the report.
+
 ## Epoch later and defer reports
 
 Use `epoch()` for an already preprocessed Raw. It performs only epoch construction and QC; it does not repeat filtering, ASR or ICA and does not require the original recording.

@@ -67,7 +67,8 @@ def inspect_artifacts(wheel, sdist):
                          'docs/en/usage.md', 'docs/zh-CN/usage.md',
                          'docs/en/workflow.md', 'docs/zh-CN/workflow.md',
                          'docs/THIRD_PARTY_NOTICES.md',
-                         'tests/fixtures/computation_v040a3.json'):
+                         'tests/fixtures/computation_v040a3.json',
+                         'tests/fixtures/computation_v040a4.json'):
             assert required in relative, required
         assert not any(name.endswith('.fif') for name in relative)
     return {'name': metadata['Name'], 'version': metadata['Version'],

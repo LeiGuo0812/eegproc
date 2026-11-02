@@ -72,7 +72,7 @@ def test_valid_eeglab_training_band_does_not_add_review_requirement():
     config=PipelineConfig(preset='eeglab')
     effective,audit=resolve_for_raw(config,raw_at(256))
     assert effective is config and audit['adjustments']==[]
-    assert not audit['iclabel_nominal_training_band']
+    assert audit['iclabel_nominal_training_band']
     assert audit['review_notes']==[] and not audit['manual_review_required']
 
 

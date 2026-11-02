@@ -14,6 +14,7 @@ recursive-include docs/zh-CN *.md
 recursive-include docs/assets *.png *.md
 recursive-include tests *.py
 include tests/fixtures/computation_v040a3.json
+include tests/fixtures/computation_v040a4.json
 include scripts/validate_clean_install.py scripts/offline_build.py
 include scripts/generate_parameter_reference.py
 recursive-include .github/workflows *.yml *.yaml

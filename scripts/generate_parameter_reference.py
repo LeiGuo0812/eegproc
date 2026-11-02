@@ -13,7 +13,7 @@ B = chr(96)
 
 # Name | constraint/unit | English | Chinese
 DESCRIPTIONS = """
-preset|standard / eeglab|Default parameter set within the same pipeline. eeglab approximates the original script; it does not reproduce MATLAB numerically.|同一流程的参数默认值；eeglab 近似对齐原脚本，不代表 MATLAB 数值复现。
+preset|standard / eeglab|Default parameter set within the same pipeline. Both request ICA training at 1–100 Hz; eeglab approximates selected original-script settings, not MATLAB numerical output.|同一流程的参数默认值；两者均请求 1–100 Hz ICA 训练，eeglab 近似对齐原脚本的部分设置，不代表 MATLAB 数值复现。
 purpose|rest / erp|Analysis defaults; does not itself enable epoch export.|分析目的默认值，不单独开启分段。
 task_name|str / None; 1–100 characters|Task metadata, independent of purpose, filenames and event selection. No surrounding whitespace/control characters.|任务名称元数据，独立于 purpose、文件名和事件筛选；无首尾空格或控制字符。
 filter_method|mne_fir / eeglab_fir / off|Analysis/training FIR implementation; off skips explicit band filtering.|分析与训练数据的 FIR 实现；off 跳过显式带通滤波。
@@ -21,8 +21,8 @@ filter_order|even int ≥ 2; samples|Used by eeglab_fir only; MNE FIR chooses it
 filter_position|after_reference|Currently the only supported filter position.|目前仅支持在参考处理之后滤波。
 highpass|Hz > 0; < lowpass|Analysis high-pass edge; limited by existing acquisition filtering.|分析高通边缘，受已有采集滤波限制。
 lowpass|Hz > highpass; < Nyquist|Analysis low-pass edge; may be clipped to input limits.|分析低通边缘，必要时根据输入限制下调。
-training_highpass|Hz > 0; < training_lowpass|ICA training high-pass edge. Identical analysis/training bands reuse the filtered signal.|ICA 训练高通边缘；分析与训练频段相同时复用滤波信号。
-training_lowpass|Hz > training_highpass; < Nyquist|ICA training low-pass edge; nominal ICLabel training is 1–100 Hz.|ICA 训练低通边缘；ICLabel 标准训练频段为 1–100 Hz。
+training_highpass|Hz > 0; < training_lowpass|ICA training high-pass edge; default 1 Hz in every preset. Explicit overrides are allowed; input-limit adjustments are recorded.|ICA 训练高通边缘；所有预设默认 1 Hz。允许显式覆盖，受输入限制产生的调整会记录。
+training_lowpass|Hz > training_highpass; < Nyquist|ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band cannot restore unavailable input frequencies.|ICA 训练低通边缘；所有预设默认 100 Hz。请求 1–100 Hz 无法恢复输入中不存在的频率。
 line_method|spectrum_fit / notch / off|Line-noise method; spectrum_fit uses MNE multitaper sinusoidal fitting.|工频方法；spectrum_fit 使用 MNE 多锥窗正弦拟合。
 line_frequency|Hz > 0 / None|Known mains frequency, normally 50 or 60; harmonics up to min(100, sfreq/2−1) Hz. None disables removal. Not an automatic estimator.|已知工频，通常为 50 或 60；处理不超过 min(100, sfreq/2−1) Hz 的谐波；None 关闭，不自动估计。
 line_window_seconds|seconds > 0|spectrum_fit window. Unsupported DPSS settings reset to 4 s / 2 Hz; unusably short spans are reported.|spectrum_fit 窗长；不支持的 DPSS 组合恢复 4 秒 / 2 Hz；过短片段记录在报告。

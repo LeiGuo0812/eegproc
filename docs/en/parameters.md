@@ -29,7 +29,7 @@ print(config.adjustments)
 
 | Parameter | Type | Values / units | Meaning | standard/rest | standard/erp | eeglab/rest | eeglab/erp |
 |---|---|---|---|---|---|---|---|
-| `preset` | str | standard / eeglab | Default parameter set within the same pipeline. eeglab approximates the original script; it does not reproduce MATLAB numerically. | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
+| `preset` | str | standard / eeglab | Default parameter set within the same pipeline. Both request ICA training at 1–100 Hz; eeglab approximates selected original-script settings, not MATLAB numerical output. | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
 | `filter_method` | str | mne_fir / eeglab_fir / off | Analysis/training FIR implementation; off skips explicit band filtering. | `'mne_fir'` | `'mne_fir'` | `'eeglab_fir'` | `'eeglab_fir'` |
 | `filter_order` | int | even int ≥ 2; samples | Used by eeglab_fir only; MNE FIR chooses its own length. | `15000` | `15000` | `15000` | `15000` |
 | `filter_position` | str | after_reference | Currently the only supported filter position. | `'after_reference'` | `'after_reference'` | `'after_reference'` | `'after_reference'` |
@@ -59,8 +59,8 @@ print(config.adjustments)
 | `ica_backend` | str | mne | Supported ICA interface; solver is selected by ica_method. | `'mne'` | `'mne'` | `'mne'` | `'mne'` |
 | `highpass` | float | Hz > 0; < lowpass | Analysis high-pass edge; limited by existing acquisition filtering. | `0.5` | `0.1` | `0.5` | `0.5` |
 | `lowpass` | float | Hz > highpass; < Nyquist | Analysis low-pass edge; may be clipped to input limits. | `80.0` | `30.0` | `100.0` | `100.0` |
-| `training_highpass` | float | Hz > 0; < training_lowpass | ICA training high-pass edge. Identical analysis/training bands reuse the filtered signal. | `1.0` | `1.0` | `0.5` | `0.5` |
-| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA training low-pass edge; nominal ICLabel training is 1–100 Hz. | `100.0` | `100.0` | `100.0` | `100.0` |
+| `training_highpass` | float | Hz > 0; < training_lowpass | ICA training high-pass edge; default 1 Hz in every preset. Explicit overrides are allowed; input-limit adjustments are recorded. | `1.0` | `1.0` | `1.0` | `1.0` |
+| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band cannot restore unavailable input frequencies. | `100.0` | `100.0` | `100.0` | `100.0` |
 | `line_frequency` | float / None | Hz > 0 / None | Known mains frequency, normally 50 or 60; harmonics up to min(100, sfreq/2−1) Hz. None disables removal. Not an automatic estimator. | `50.0` | `50.0` | `50.0` | `50.0` |
 | `artifact_threshold` | float | 0.5 ≤ probability ≤ 1 | threshold only: minimum maximum Muscle/Eye/Heart/Line/Channel probability. | `0.9` | `0.9` | `0.9` | `0.9` |
 | `brain_probability_max` | float | 0 ≤ probability ≤ 0.5 | threshold only: largest Brain probability allowed for removal. | `0.2` | `0.2` | `0.2` | `0.2` |

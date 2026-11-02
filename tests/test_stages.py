@@ -19,7 +19,7 @@ def test_presets_and_override_precedence():
         actual=getattr(p,key)
         assert (list(actual) if isinstance(actual,tuple) else actual) == value
     c=resolve_config(preset='eeglab',purpose='erp',lowpass=40.)
-    assert c.highpass==.5 and c.lowpass==40 and c.training_highpass==.5
+    assert c.highpass==.5 and c.lowpass==40 and c.training_highpass==1.
     assert c.ica_rule=='class_max' and c.filter_order==15000
     assert not c.interpolate_before_asr and c.final_interpolation and c.final_reference
     assert c.filter_position=="after_reference" and c.preset=="eeglab"
