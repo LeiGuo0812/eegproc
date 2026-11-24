@@ -207,12 +207,12 @@ flowchart TB
 
 With `epoch_qc="auto"`, event epochs use actual event-window QC and fixed epochs use continuous annotation rejection. Bounded repair is an alternative epoch path. Both preserve input BAD; the report includes per-condition retention and rejection reasons.
 
-- The standard common band is **0.5–100 Hz for rest** and **0.1–100 Hz for ERP**. The `eeglab` common band remains **0.5–100 Hz** for both purposes. Line cleaning occurs before this filter and before ASR, not only on the final low-pass output.
+- The standard common band is **0.5–100 Hz for rest** and **0.1–100 Hz for ERP**. The `eeglab` common band remains **0.5–100 Hz** for both purposes. Line cleaning runs before the common-band filter and ASR.
 - Both presets request **1–100 Hz ICA training**. The analysis branch retains its own band; training overrides remain available, and acquisition limits can narrow the effective band. These adjustments are recorded in the report.
 - If analysis and ICA training bands are identical, for example **1–100 Hz**, they share the full-record band buffer. Selecting valid training samples and numerical algorithm work can still require other arrays.
-- ASR never calibrates or carries state across input BAD/boundary spans. Segments shorter than the configured minimum are skipped and reported. `asr_cutoff=None` bypasses ASR.
-- Each eligible ASR segment independently selects reference data, calibrates and reconstructs. The default segment minimum is 20 seconds. The gross-artifact mask is for later ICA training exclusion, not an additional ASR exclusion mask.
-- Bad-channel detection uses a temporary training-band copy without input BAD/boundary samples, defaulting to **1–100 Hz in both presets**. ICA training retains valid subsegments of at least 1 second and requires at least 20 seconds in total by default. Its bounded diagnostic preview remains in memory, not another Raw file.
+- ASR calibrates separately within spans split by input BAD and boundary annotations and resets its state at each split. Segments shorter than the configured minimum are skipped and reported. `asr_cutoff=None` bypasses ASR.
+- Each eligible ASR segment independently selects reference data, calibrates and reconstructs. The default segment minimum is 20 seconds. The gross-artifact mask excludes samples from ICA training only.
+- Bad-channel detection uses a temporary training-band copy without input BAD/boundary samples, defaulting to **1–100 Hz in both presets**. ICA training retains valid subsegments of at least 1 second and requires at least 20 seconds in total by default. The bounded diagnostic preview is kept in memory.
 - Optional `interpolate_before_asr=True` changes the bad-channel handling at that point. Reference/interpolation switches remain effective; `reference="unchanged"` also prevents reference changes at the final stage.
 - With the default `threshold` rule, Heart-only ICLabel candidates require ECG correlation when usable ECG exists; otherwise ICLabel alone is used. `class_max` uses the original category rule without ECG assistance.
 - Event-window QC preserves all input BAD annotations, including manual labels and any pre-existing `BAD_residual`. It reevaluates only `BAD_residual` added by this run on the actual requested trial. The continuous output keeps those annotations. Optional bounded epoch repair changes epochs only.
@@ -277,7 +277,7 @@ flowchart TB
 
 Provide the original prepared FIF or the unchanged original Raw. Compatibility checks include the computation source and dependencies. Resume requires a separate output directory. The new list replaces the previous decision, so previously removed components omitted from the list are restored.
 
-Continuation reuses filtering, ASR, the ICA fit and ICLabel results. It reuses the parent checkpoint rather than writing another full copy. Checkbox edits alone do not modify saved FIFs; the original report's labels and plots describe its saved result until a new run is created.
+Continuation uses the existing checkpoint and reuses filtering, ASR, the ICA fit and ICLabel results. Checkbox edits set the exclusions for the next run. The saved FIFs and original report continue to reflect the saved result.
 
 ## Standalone epoching
 
@@ -296,7 +296,7 @@ flowchart TB
 
 `epoch()` uses the same epoch kernel as stage 7. It does not repeat line cleaning, channel detection, filters, ASR or ICA. The cleaned Raw/FIF carries the global bad-channel list, relevant epoch defaults and minimal automatic-residual origins. Existing, manual and unknown BAD remain protected. The source Raw is unchanged; only the Epochs receive baseline correction or optional bounded repair.
 
-The source report is optional and supplies presentation material, not BAD decisions or required original data. An explicit source takes priority over a same-directory HTML/package and the Raw's report-path hint. Missing or unreadable sources warn and produce an independent epoch report. Choose the correct source yourself; no recording-identity matching is added. New combined HTML keeps the original report by default.
+The optional source report supplies figures and presentation material. The cleaned Raw supplies the data and BAD annotations for epoch decisions. An explicit source takes priority over a same-directory HTML/package and the Raw's report-path hint. Missing or unreadable sources warn and produce an independent epoch report. Select the source report for the recording. The lookup uses file paths without checking recording identity. New combined HTML keeps the original report by default.
 
 ## Immediate or delayed report delivery
 
@@ -314,7 +314,7 @@ flowchart TB
     draw -->|Incomplete| recovery["Retain package and log"]
 ```
 
-`run()`, `epoch()` and `resume()` default to immediate HTML through a fresh report subprocess. The data-processing caller first collects bounded numeric material without actively importing Agg or font-rendering components; MNE itself may import Matplotlib. `report=False` saves one `*_report_data.npz`, with no drawing or HTML. Representative before/after windows, spectrum summaries, ICA diagnostics and QC records are retained; a full original Raw is not copied. Rendering does not rerun denoising or epoch QC. Existing HTML reuses embedded figures in the same isolated path. A complete immediate report removes temporary material; partial or failed rendering retains a compact package and log. Report status is independent of processing status. Scientific defaults and the four-second waveform display window are unchanged.
+`run()`, `epoch()` and `resume()` default to immediate HTML through a fresh report subprocess. The data-processing caller first collects bounded numeric material without importing Agg or font-rendering components for report production. MNE itself may import Matplotlib. `report=False` saves one `*_report_data.npz`, with no drawing or HTML. The package retains representative before/after windows, spectrum summaries, ICA diagnostics and QC records. It omits a full copy of the original Raw. The isolated renderer uses stored diagnostics or figures embedded in existing HTML. Denoising and epoch QC remain as recorded. A complete immediate report removes temporary material; partial or failed rendering retains a compact package and log. Report status is independent of processing status. Scientific defaults and the four-second waveform display window are unchanged.
 
 ## Input and delivered files
 

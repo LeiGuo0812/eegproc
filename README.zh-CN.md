@@ -4,7 +4,7 @@
 
 eegproc 是基于 MNE 的静息态与任务脑电预处理软件包。输入连续 Raw 数据，完成工频去除、坏导检测、ASR、ICLabel 辅助 ICA，以及连续信号或事件窗质控；输出 MNE FIF 数据和单文件 HTML 报告，支持在报告中调整 ICA 成分选择。
 
-优先通过 Python 代码配置，也支持 JSON 和命令行。每次 ICA 运行保留断点，方便修改剔除列表，无需重新分解。
+优先通过 Python 代码配置，也支持 JSON 和命令行。每次 ICA 运行保留断点，修改剔除列表时复用已有分解。
 
 ## 安装
 
@@ -31,7 +31,7 @@ clean_raw = result.raw
 print(result.status, result.outputs["quality_report"])
 ```
 
-输入前确认 EEG/EOG/ECG 单位为 V，电极坐标单位为 m，并正确设置通道类型、montage 和事件时间。设备文件由 `eegproc.preparation.prepare_data` 单独准备。流程不修改输入 Raw，保留原始 BAD 注释和辅助通道样本。
+输入前确认 EEG/EOG/ECG 单位为 V，电极坐标单位为 m，并正确设置通道类型、montage 和事件时间。设备文件由 `eegproc.preparation.prepare_data` 单独准备。流程在工作副本上处理，保留输入 Raw、原始 BAD 注释和辅助通道样本。
 
 如果任务记录的刺激注释为 `"1"` 和 `"2"`：
 
@@ -61,7 +61,7 @@ erp = run(
 
 ## 后续独立分段与延迟报告
 
-已完成连续预处理的 Raw 可直接调用 `epoch()`。它只执行分段和质控，不重复滤波、ASR 或 ICA，也不依赖预处理前的原始记录。
+`epoch()` 以完成连续预处理的 Raw 作为信号输入，复用已有滤波、ASR 和 ICA 结果，直接分段和质控。
 
 ```python
 from eegproc import run, epoch, render_report
@@ -77,7 +77,7 @@ render_report(seg, "outputs/sub01_epochs/sub01_report.html")
 epochs = seg.epochs
 ```
 
-`run()`、`epoch()`、`resume()` 均默认 `report=True`，报告交给全新子进程绘制。`report=False` 时不绘图、不写 HTML，只保存一个 `*_report_data.npz`，供后续生成报告。eegproc 的数值采集模块不主动导入 Agg 或字体渲染组件；MNE 自身的操作仍可能导入 Matplotlib。不复制整份原始 Raw。`render_report()` 可接收结果对象、已有 HTML 或报告数据包，并使用相同的隔离渲染方式。报告状态区分 `completed`、`partial`、`failed` 和 `deferred`，与处理状态分开；报告不完整时保留有限素材和错误日志供恢复。
+`run()`、`epoch()`、`resume()` 均默认 `report=True`，报告交给全新子进程绘制。`report=False` 时以一个 `*_report_data.npz` 代替绘图和 HTML 写入，供后续生成报告。数据包保存有限诊断素材，原始 Raw 留在原处。eegproc 将 Agg 和字体渲染组件的导入留在绘图阶段，MNE 的操作仍可能导入 Matplotlib。`render_report()` 可接收结果对象、已有 HTML 或报告数据包，并使用相同的隔离渲染方式。报告状态区分 `completed`、`partial`、`failed` 和 `deferred`，与处理状态分开；报告不完整时保留有限素材和错误日志供恢复。
 
 `epoch()` 从清理后 Raw/FIF 读取 BAD 来源和全局坏导信息。原有、人工及未知来源 BAD 继续参与拒绝；事件窗质控只重新检查明确标记的自动残留。程序自动查找此前的 HTML 或报告包，也可通过 `source_report="path/to/report.html"` 手动指定。报告缺失或无法读取时提醒，并生成独立分段报告。默认保留原 HTML，详见[独立分段与报告](docs/zh-CN/usage.md#独立分段)。
 
@@ -93,7 +93,7 @@ python examples/batch_process.py manifest.csv --output outputs/cohort --workers 
 python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-清单与目录格式见[完整使用教程](docs/zh-CN/usage.md#可执行示例)。恢复时保持清单各行不变。已完成的记录跳过；延迟、缺图或失败的报告仅从保存素材重试，不重复预处理。科学处理失败或输出不完整时，解决原因后使用新输出目录重新处理，示例不会自动重跑科学计算。
+清单与目录格式见[完整使用教程](docs/zh-CN/usage.md#可执行示例)。清单各行保持一致时，恢复会跳过已完成记录，从保存的素材重试延迟、缺图或失败的报告。科学处理失败或输出不完整的记录留待手动处理，解决故障后用新输出目录重新运行。
 
 `--workers` 默认为 1，控制同时处理的记录数；每个 worker 使用 `n_threads=1`，并在导入 EEG 库前设置数值线程环境。`--timeout` 默认每份记录 86400 秒，超时会一并终止该 worker 及其报告子进程。建议从一至两个 worker 开始，测量内存峰值后再增加。请同时检查 `batch_summary.json` 中的处理状态与报告状态。Ctrl+C 会终止活动 worker 树、取消排队记录，并保存恢复摘要；每份记录的简短 `batch_result.json` 用于恢复。失败尝试保留日志和报告素材，完整报告生成后删除批处理自建的素材包和 worker 日志。
 
@@ -163,7 +163,7 @@ outputs/sub01_rest/
     └── checkpoint.json        续处理状态
 ```
 
-请求分段且有保留试次时，另输出 `sub01_clean-epo.fif`。报告图片和表格直接嵌入 HTML。`report=False` 时以 `sub01_report_data.npz` 替代即时 HTML；独立 `epoch()` 只写保留的分段 FIF 和 HTML 或报告包。连续 BAD 注释标记问题区间，不删除采样点。
+请求分段且有保留试次时，另输出 `sub01_clean-epo.fif`。报告图片和表格直接嵌入 HTML。`report=False` 时以 `sub01_report_data.npz` 替代即时 HTML；独立 `epoch()` 只写保留的分段 FIF 和 HTML 或报告包。连续 BAD 注释标记问题区间，采样点保留。
 
 若希望先复核再减除，设置 `ica_mode="review"`。若要修改已完成的自动结果，在报告的 IC 卡片或详情中调整 **Exclude**，下载选择文件，再用断点调用 `resume()`。新的完整列表可恢复先前删除的成分，复用原滤波、ASR 和 ICA 分解。请保留准备后的原始输入和全部断点文件，具体操作见[使用示例](docs/zh-CN/usage.md)。
 

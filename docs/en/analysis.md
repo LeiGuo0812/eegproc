@@ -2,7 +2,7 @@
 
 [Home](../../README.md) · [中文](../zh-CN/analysis.md) · [Usage](usage.md) · [Results](results.md)
 
-Start from an accepted run and keep its report, actual parameters and exclusion decisions with the analysis. The examples below illustrate MNE operations; choose frequencies, electrodes, time windows and statistical contrasts from the study design. Processing completion does not determine whether a recording answers the research question.
+Start from an accepted run and keep its report, actual parameters and exclusion decisions with the analysis. The examples below illustrate MNE operations. Choose frequencies, electrodes, time windows and statistical contrasts from the study design, and assess each recording against those requirements.
 
 ## Choose the output and analysis settings
 
@@ -15,7 +15,7 @@ Start from an accepted run and keep its report, actual parameters and exclusion 
 | Source analysis | Accepted MNE data plus head model/locations | Digitization, coregistration, reference, rank and covariance model |
 | Group statistics / decoding | Per-subject outputs/features | Independent unit, missing data, multiple comparisons and validation split |
 
-Keep preprocessing consistent within the planned comparison. If two settings are scientifically plausible, define a small sensitivity analysis and compare conclusions; do not choose the setting that produces the strongest desired effect.
+Keep preprocessing consistent within the planned comparison. If two settings are scientifically plausible, choose the primary setting on methodological grounds and use a small sensitivity analysis to compare conclusions.
 
 ## Resting-state power spectrum and band power
 
@@ -54,7 +54,7 @@ spectrum.plot(average=True)
 
 The denominator defines what “relative alpha” means: changing 1–40 Hz to another range changes the measure. Longer windows improve frequency resolution but may retain fewer artifact-free segments. Retention, stationarity and spectral precision should be evaluated together. MNE's [Spectrum tutorial](https://mne.tools/stable/auto_tutorials/time-freq/10_spectrum_class.html) explains spectral objects and estimators.
 
-If you compute PSD directly on Raw, explicitly choose `reject_by_annotation=True` and compatible estimator settings. Never concatenate noncontiguous good samples into a fake continuous trace for filtering or ordinary FFT analysis: that introduces artificial discontinuities.
+If you compute PSD directly on Raw, explicitly choose `reject_by_annotation=True` and compatible estimator settings. Keep noncontiguous good samples in separate segments for filtering or ordinary FFT analysis. Joining them introduces discontinuities.
 
 ## ERP inspection and measurement
 
@@ -82,9 +82,9 @@ mean_difference_uv = difference.get_data(picks=roi)[:, interval].mean() * 1e6
 print("Target-minus-standard ROI mean (µV):", mean_difference_uv)
 ```
 
-Mean amplitude over a preselected interval is often easier to compare reproducibly than selecting each subject's largest peak. The illustrated 300–600 ms interval is not a universal P300 definition. Inspect baseline, single-trial distributions, latency alignment, scalp distribution and each condition's sample size. See [MNE's ERP tutorial](https://mne.tools/stable/auto_tutorials/evoked/30_eeg_erp.html) and [epoch visualization](https://mne.tools/stable/auto_tutorials/epochs/20_visualize_epochs.html).
+Mean amplitude over a preselected interval is often easier to compare reproducibly than selecting each subject's largest peak. The example uses a 300–600 ms interval. Choose the P300 interval for your study. Inspect baseline, single-trial distributions, latency alignment, scalp distribution and each condition's sample size. See [MNE's ERP tutorial](https://mne.tools/stable/auto_tutorials/evoked/30_eeg_erp.html) and [epoch visualization](https://mne.tools/stable/auto_tutorials/epochs/20_visualize_epochs.html).
 
-Unequal trial counts imply unequal precision. Do not automatically discard trials merely to force equality for every analysis; decide whether balancing is required by the estimator or experimental contrast, and report any subsampling seed. Do not reapply a different baseline casually to already baseline-corrected epochs; document the original correction.
+Unequal trial counts imply unequal precision. Balance trial counts when the estimator or experimental contrast requires it, and report any subsampling seed. Document the original baseline correction and review it before applying a different one.
 
 ## Time-frequency analysis
 
@@ -113,15 +113,15 @@ power.crop(tmin=-0.8, tmax=1.0)
 power.plot(picks=["Cz"])
 ```
 
-Here frequencies remain below the 30 Hz analysis low-pass. The cycle schedule, padding and baseline are example choices, not pipeline defaults. This averages **single-trial power**; it includes evoked and non-phase-locked contributions. Power of the averaged ERP is a different quantity. Plan induced-power estimation explicitly when that is the target. The MNE [frequency/time-frequency tutorial](https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html) describes the relevant representations.
+The frequencies in this example are below the 30 Hz analysis low-pass. The example supplies its own cycle schedule, padding and baseline. It averages **single-trial power**, including evoked and non-phase-locked contributions. Power of the averaged ERP is a different quantity. Plan induced-power estimation explicitly when that is the target. The MNE [frequency/time-frequency tutorial](https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html) describes the relevant representations.
 
 ![Exploratory time-frequency display from the short synthetic epochs](../assets/synthetic_time_frequency.png)
 
-This separate [script example](../../examples/analyze_outputs.py) averages all retained synthetic trials at Pz and displays log10 power relative to baseline. It uses the short default ERP epochs and is a plotting demonstration: edge effects and its short baseline limit interpretation. Use padded epochs such as the code above for a planned time-frequency analysis. It is not a target-versus-standard contrast or a validation of neural recovery.
+This separate [script example](../../examples/analyze_outputs.py) averages all retained synthetic trials at Pz and displays log10 power relative to baseline. The figure demonstrates plotting with the short default ERP epochs, where edge effects and the short baseline limit interpretation. Use padded epochs such as those in the code above for a planned time-frequency analysis. The pooled display shows neither a target-versus-standard contrast nor a measure of neural recovery.
 
 ## Connectivity and source analysis
 
-MNE-Connectivity is a separate downstream package, not an eegproc runtime dependency. In an analysis environment, the user may install a chosen compatible release, then use accepted EEG epochs:
+Install a compatible release of the optional downstream package MNE-Connectivity in your analysis environment, then use accepted EEG epochs:
 
 ```python
 # Requires a separately installed mne-connectivity version supporting this API.
@@ -135,25 +135,25 @@ connectivity = spectral_connectivity_epochs(
 matrix = connectivity.get_data(output="dense")
 ```
 
-Here `epochs` must be the intended accepted segments, for example the resting epochs above, rather than an unrelated condition left in a notebook variable. Require enough stationary segments; changing their duration changes the spectral estimate. The [official connectivity API](https://mne.tools/mne-connectivity/stable/generated/mne_connectivity.spectral_connectivity_epochs.html) describes assumptions and supported measures. Sensor connectivity remains affected by mixing/reference choices, and a phase-lag measure does not establish anatomical or causal connectivity.
+Set `epochs` to the accepted segments for the analysis, such as the resting epochs above. Use enough stationary segments and account for their duration, which affects the spectral estimate. The [official connectivity API](https://mne.tools/mne-connectivity/stable/generated/mne_connectivity.spectral_connectivity_epochs.html) describes assumptions and supported measures. Sensor connectivity remains affected by mixing/reference choices, and a phase-lag measure does not establish anatomical or causal connectivity.
 
 For source analysis, preserve genuine electrode positions, account for average-reference/interpolation rank, and construct a suitable head model, transform and noise covariance. Template coordinates are not equivalent to individual digitization. These inputs are outside this preprocessing package; see [MNE forward modeling](https://mne.tools/stable/auto_tutorials/forward/30_forward.html).
 
 ## Group statistics and decoding
 
-For a within-subject contrast, first compute each participant's condition difference on aligned channels and times. A one-sample permutation test on subject differences preserves the paired design; treating thousands of trials as independent subjects does not. Predefine the electrode/time/frequency search space and multiplicity strategy. Cluster significance supports a cluster-level result, not precise onset or significance at every included sample. See [MNE statistical inference](https://mne.tools/stable/auto_tutorials/stats-sensor-space/10_background_stats.html) and the [one-sample cluster API](https://mne.tools/stable/generated/mne.stats.permutation_cluster_1samp_test.html).
+For a within-subject contrast, first compute each participant's condition difference on aligned channels and times. A one-sample permutation test on subject differences preserves the paired design by using participants as the independent units. Predefine the electrode/time/frequency search space and multiplicity strategy. Cluster significance supports a cluster-level result, not precise onset or significance at every included sample. See [MNE statistical inference](https://mne.tools/stable/auto_tutorials/stats-sensor-space/10_background_stats.html) and the [one-sample cluster API](https://mne.tools/stable/generated/mne.stats.permutation_cluster_1samp_test.html).
 
-For decoding, split by the intended generalization unit, such as participant or session. Fit feature selection, scaling and learned transforms within the appropriate training folds. Whole-recording preprocessing is not automatically leakage-free for every predictive claim; align preprocessing and validation with the prospective deployment setting. Report excluded participants, missing conditions, duration/trial distributions and any parameter sensitivity analyses.
+For decoding, split by the intended generalization unit, such as participant or session. Fit feature selection, scaling and learned transforms within the appropriate training folds. Assess leakage from whole-recording preprocessing against the prospective deployment setting, and align preprocessing and validation accordingly. Report excluded participants, missing conditions, duration/trial distributions and any parameter sensitivity analyses.
 
 ## If the target filter band changes
 
-The pipeline computes a common band spanning analysis and ICA training bands, applies ASR there, and then produces the required analysis/training branches. Thus changing the analysis band can affect more than the final picture:
+The pipeline computes a common band spanning analysis and ICA training bands, applies ASR there, and then produces the required analysis/training branches. The effect of changing the analysis band depends on how it changes the common band.
 
 - If the common band stays the same, ASR and the ICA training input may stay comparable, while final waveform amplitudes, residual QC and epoch retention can still change.
 - If the common band expands or its lower edge changes, ASR calibration/reconstruction and later ICA can also change.
-- Making both bands 1–100 Hz saves a full-record branch but removes the ERP analysis protection provided by a lower high-pass. A lower simulated aggregate error elsewhere does not guarantee preserved slow ERP components.
+- Making both bands 1–100 Hz saves a full-record branch and applies a 1 Hz high-pass to ERP data. Assess slow-component preservation from the ERP waveform alongside the simulated aggregate error.
 - Raising the low-pass to study gamma retains additional muscle/line-related activity; lowering it makes that frequency range unavailable for later analysis.
 
-For slow ERP components, evaluate waveform shape and baseline/latency effects before increasing high-pass. For spectral analyses, assess attenuation near filter transitions rather than treating cutoffs as perfectly sharp boundaries. Once frequencies are removed, later filtering cannot recover them. MNE's [filtering background](https://mne.tools/stable/auto_tutorials/preprocessing/25_background_filtering.html) explains ringing, transitions and distortion.
+For slow ERP components, evaluate waveform shape and baseline/latency effects before increasing high-pass. For spectral analyses, assess attenuation across the transition bands at the cutoffs. Once frequencies are removed, later filtering cannot recover them. MNE's [filtering background](https://mne.tools/stable/auto_tutorials/preprocessing/25_background_filtering.html) explains ringing, transitions and distortion.
 
 Compare candidate settings on the **same input, event list, seeds and declared QC rules**. Track retained duration/trials, regional bad-channel burden, residual artifacts and the scientific outcome together. Retain both reports and designate one primary configuration before group hypothesis testing.

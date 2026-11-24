@@ -6,7 +6,7 @@ All 75 PipelineConfig fields are listed below. Defaults are generated from the c
 
 ## Configuration in Python
 
-Priority: **preset defaults < optional JSON file < config object/mapping < explicit run keywords**. A PipelineConfig is immutable and fully resolved: all its fields become explicit when passed as a base. Construct a new config to obtain a new purpose's defaults rather than changing only purpose on an existing config.
+Priority: **preset defaults < optional JSON file < config object/mapping < explicit run keywords**. A PipelineConfig is immutable and fully resolved: all its fields become explicit when passed as a base. Construct a new config with the desired purpose to use that purpose's defaults.
 
 ```python
 from dataclasses import asdict
@@ -29,7 +29,7 @@ print(config.adjustments)
 
 | Parameter | Type | Values / units | Meaning | standard/rest | standard/erp | eeglab/rest | eeglab/erp |
 |---|---|---|---|---|---|---|---|
-| `preset` | str | standard / eeglab | Default parameter set within the same pipeline. Both request ICA training at 1–100 Hz; eeglab approximates selected original-script settings, not MATLAB numerical output. | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
+| `preset` | str | standard / eeglab | Default parameter set within the same pipeline. Both request 1–100 Hz for ICA training. The eeglab preset approximates selected settings from the original script. Numerical results can differ from MATLAB. | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
 | `filter_method` | str | mne_fir / eeglab_fir / off | Analysis/training FIR implementation; off skips explicit band filtering. | `'mne_fir'` | `'mne_fir'` | `'eeglab_fir'` | `'eeglab_fir'` |
 | `filter_order` | int | even int ≥ 2; samples | Used by eeglab_fir only; MNE FIR chooses its own length. | `15000` | `15000` | `15000` | `15000` |
 | `filter_position` | str | after_reference | Currently the only supported filter position. | `'after_reference'` | `'after_reference'` | `'after_reference'` | `'after_reference'` |
@@ -39,7 +39,7 @@ print(config.adjustments)
 | `line_p_value` | float | 0 < p < 1 | spectrum_fit significance threshold; inactive for notch/off. | `0.05` | `0.05` | `0.05` | `0.05` |
 | `channel_method` | str | pyprep / eegprep / off | Bad-channel detector; eegprep needs an optional extra. Input bad channels remain relevant when off. | `'pyprep'` | `'pyprep'` | `'eegprep'` | `'eegprep'` |
 | `flatline_seconds` | float | seconds > 0 | Flatline duration for the EEGPrep-compatible detector. | `5.0` | `5.0` | `5.0` | `5.0` |
-| `channel_correlation` | float | 0 < fraction < 1 | EEGPrep-compatible correlation threshold; does not replace PyPREP internal settings. | `0.8` | `0.8` | `0.8` | `0.8` |
+| `channel_correlation` | float | 0 < fraction < 1 | Correlation threshold for the EEGPrep-compatible detector. PyPREP uses its internal settings. | `0.8` | `0.8` | `0.8` | `0.8` |
 | `channel_broken_fraction` | float | 0 < fraction < 1 | EEGPrep-compatible fraction of failed channel windows. | `0.4` | `0.4` | `0.4` | `0.4` |
 | `reference` | str | average / unchanged | Reference method for initial and enabled final reference; unchanged skips both. | `'average'` | `'average'` | `'average'` | `'average'` |
 | `interpolate_bads` | bool | bool | Global interpolation gate; False also disables pre-ASR interpolation. | `True` | `True` | `True` | `True` |
@@ -50,30 +50,30 @@ print(config.adjustments)
 | `ica_enabled` | bool | bool | Enable ICA/ICLabel/application. False deactivates review/manual selection. | `True` | `True` | `True` | `True` |
 | `ica_mode` | str | auto / review / manual | auto applies a proposal; review pauses before subtraction; manual applies a complete explicit list. | `'auto'` | `'auto'` | `'auto'` | `'auto'` |
 | `ica_exclude` | tuple / None | tuple[int] / None; zero-based | Complete list; [] keeps all. Supplying a list in auto selects manual. Invalid/out-of-range indices are audited, never replaced with automatic choices. | `None` | `None` | `None` | `None` |
-| `ica_rule` | str | threshold / class_max | Automatic selection rule defined below; does not change ICA fitting. | `'threshold'` | `'threshold'` | `'class_max'` | `'class_max'` |
+| `ica_rule` | str | threshold / class_max | Selects the automatic rule for excluding fitted components. See the rules below. | `'threshold'` | `'threshold'` | `'class_max'` | `'class_max'` |
 | `rank_method` | str | relative / covariance | relative: singular values > max(machine-precision tolerance, largest singular value × 1e-6). covariance: min(matrix_rank, covariance eigenvalues > 1e-7 µV²). | `'relative'` | `'relative'` | `'covariance'` | `'covariance'` |
 | `review_author` | str | str | Reviewer label for an initial manual decision. | `''` | `''` | `''` | `''` |
 | `review_reason` | str | str | Reason for an initial manual decision. | `''` | `''` | `''` | `''` |
-| `purpose` | str | rest / erp | Analysis defaults; does not itself enable epoch export. | `'rest'` | `'erp'` | `'rest'` | `'erp'` |
+| `purpose` | str | rest / erp | Selects analysis defaults. Epoch export is configured separately. | `'rest'` | `'erp'` | `'rest'` | `'erp'` |
 | `task_name` | str / None | str / None; 1–100 characters | Task metadata, independent of purpose, filenames and event selection. No surrounding whitespace/control characters. | `'rest'` | `None` | `'rest'` | `None` |
 | `ica_backend` | str | mne | Supported ICA interface; solver is selected by ica_method. | `'mne'` | `'mne'` | `'mne'` | `'mne'` |
 | `highpass` | float | Hz > 0; < lowpass | Analysis high-pass edge; limited by existing acquisition filtering. | `0.5` | `0.1` | `0.5` | `0.5` |
 | `lowpass` | float | Hz > highpass; < Nyquist | Analysis low-pass edge; may be clipped to input limits. | `80.0` | `30.0` | `100.0` | `100.0` |
 | `training_highpass` | float | Hz > 0; < training_lowpass | ICA training high-pass edge; default 1 Hz in every preset. Explicit overrides are allowed; input-limit adjustments are recorded. | `1.0` | `1.0` | `1.0` | `1.0` |
-| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band cannot restore unavailable input frequencies. | `100.0` | `100.0` | `100.0` | `100.0` |
-| `line_frequency` | float / None | Hz > 0 / None | Known mains frequency, normally 50 or 60; harmonics up to min(100, sfreq/2−1) Hz. None disables removal. Not an automatic estimator. | `50.0` | `50.0` | `50.0` | `50.0` |
+| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band is limited to frequencies retained in the input. | `100.0` | `100.0` | `100.0` | `100.0` |
+| `line_frequency` | float / None | Hz > 0 / None | Supply the known mains frequency, typically 50 or 60 Hz. Removal covers harmonics up to min(100, sfreq/2−1) Hz. None disables removal. | `50.0` | `50.0` | `50.0` | `50.0` |
 | `artifact_threshold` | float | 0.5 ≤ probability ≤ 1 | threshold only: minimum maximum Muscle/Eye/Heart/Line/Channel probability. | `0.9` | `0.9` | `0.9` | `0.9` |
 | `brain_probability_max` | float | 0 ≤ probability ≤ 0.5 | threshold only: largest Brain probability allowed for removal. | `0.2` | `0.2` | `0.2` | `0.2` |
 | `asr_cutoff` | float / None | positive / None | Burst cutoff; None disables ASR. Default 20 for both rest and ERP. | `20.0` | `20.0` | `20.0` | `20.0` |
 | `asr_backend` | str | mne_native | Independent MNE-compatible ASR; no runtime ASRpy dependency. | `'mne_native'` | `'mne_native'` | `'mne_native'` | `'mne_native'` |
 | `asr_options` | dict / None | dict / None | Advanced overrides below; cutoff/min_segment_seconds use top-level settings. | `None` | `None` | `None` | `None` |
 | `seed` | int | int; 0 ≤ seed < 2**32 | Random seed for ICA and applicable detection/repair stages. | `20261018` | `20261018` | `20261018` | `20261018` |
-| `n_threads` | int | int ≥ 1 | Numerical thread limit, not recording-level batch scheduling. | `1` | `1` | `1` | `1` |
+| `n_threads` | int | int ≥ 1 | Thread limit for numerical calculations. Set recording-level concurrency separately. | `1` | `1` | `1` | `1` |
 | `ica_max_iter` | int | int ≥ 1 | Iteration limit; limit/convergence diagnostics are reported. | `1000` | `1000` | `4096` | `4096` |
-| `ica_tolerance` | float | positive | Picard tol or Infomax w_change; identical values need not mean identical stopping behavior. | `1e-07` | `1e-07` | `1e-07` | `1e-07` |
+| `ica_tolerance` | float | positive | Tolerance for the selected solver: Picard tol or Infomax w_change. Each solver applies its own stopping criterion. | `1e-07` | `1e-07` | `1e-07` | `1e-07` |
 | `bad_channel_fraction_limit` | float | 0 < fraction < 1 | Global bad-channel quality threshold; policy determines reporting/stopping. | `0.3` | `0.3` | `0.3` | `0.3` |
 | `bad_channel_policy` | str | auto / report / stop | report continues viable processing; stop rejects excess bad channels; auto resolves to report with the supported mne_native backend. At least 8 usable EEG channels remain required. | `'report'` | `'report'` | `'report'` | `'report'` |
-| `min_training_seconds` | float | seconds > 0 | Minimum usable training and ASR segment duration; not proof of adequate calibration. | `20.0` | `20.0` | `20.0` | `20.0` |
+| `min_training_seconds` | float | seconds > 0 | Minimum usable training and ASR segment duration. Assess calibration quality separately. | `20.0` | `20.0` | `20.0` | `20.0` |
 | `gross_peak_uv` | float | µV > 0 | Absolute peak threshold for gross training artifacts. | `500.0` | `500.0` | `500.0` | `500.0` |
 | `residual_peak_uv` | float | µV > 0 | Residual absolute peak threshold, also the default epoch screen. | `150.0` | `150.0` | `150.0` | `150.0` |
 | `residual_ptp_uv` | float | µV > 0 | Residual peak-to-peak threshold, also the default epoch screen. | `200.0` | `200.0` | `200.0` | `200.0` |
@@ -103,39 +103,39 @@ print(config.adjustments)
 | `report_dpi` | int | int ≥ 60; dpi | Raster resolution; larger values increase HTML size. | `100` | `100` | `100` | `100` |
 | `report_max_width` | int | int ≥ 600; pixels | Maximum stored report figure width. | `1200` | `1200` | `1200` | `1200` |
 | `report_psd_windows` | int | int ≥ 1 | Maximum representative windows for report PSD. | `30` | `30` | `30` | `30` |
-| `report_psd_window_seconds` | float / None | seconds > 0 / None | None uses bounded automatic sampling. Report PSD is diagnostic, not a final analysis estimate. | `None` | `None` | `None` | `None` |
+| `report_psd_window_seconds` | float / None | seconds > 0 / None | None sets the sampling window automatically within bounds. The report PSD uses sampled windows for quality review. | `None` | `None` | `None` | `None` |
 
 ## Corrections, dependencies and failure boundaries
 
-- Unknown fields are ignored; unsupported types, values and choices generally revert to the selected purpose/preset defaults. Every correction enters config.adjustments and the HTML parameter audit. An unreadable optional config file does not prevent using code parameters.
+- Unknown fields are ignored; unsupported types, values and choices generally revert to the selected purpose/preset defaults. Every correction enters config.adjustments and the HTML parameter audit. If the optional config file is unreadable, the code parameters still apply.
 - Bands are constrained by acquisition filtering and Nyquist. Removed frequencies are not restored; no implicit resampling occurs. At sfreq ≤80 Hz the current ASR backend is disabled; below 100 Hz the current ICA/ICLabel stage is disabled, with an audit.
 - Disabled ICA cancels review/manual selection. Review pauses without applying a final list. Malformed manual lists keep all components and require review; unavailable indices are omitted, including during resume. The complete effective exclusion list and changes are recorded. Checkpoint/input hashes and an imported selection JSON's model identity and reviewed=true remain strict requirements.
 - Disabling interpolation disables pre-ASR interpolation; disabling both locations disables the global switch. Inapplicable local epoch repair is disabled with an audit.
-- Missing/invalid events, unknown conditions, duplicate/out-of-range samples or impossible windows may skip epoch export while continuous processing completes. Inspect epoch_resolution and actual outputs. Continuous completion does not imply epoch export.
-- report quality policy is not a promise that every input succeeds. Missing inputs, output collisions, missing dependencies, invalid sampling/filter metadata, missing required coordinates, unusable samples/rank, and damaged/mismatched checkpoints can still stop processing. No guessed data replace such failures.
+- Missing/invalid events, unknown conditions, duplicate/out-of-range samples or impossible windows may skip epoch export while continuous processing completes. Check epoch_resolution and the output paths for the epoch export status.
+- With the report policy, processing continues after the bad-channel fraction exceeds its limit if viable. Missing inputs, output collisions, missing dependencies, invalid sampling/filter metadata, missing required coordinates, unusable samples/rank, and damaged or mismatched checkpoints can still stop processing. The pipeline reports these failures without substituting data.
 
 ## Exact ICA rules
 
-threshold: at least one of Muscle, Eye, Heart, Line noise and Channel noise reaches artifact_threshold AND Brain ≤ brain_probability_max. Other is not removed automatically. With a usable real ECG, Heart-only candidates also require maximum absolute Pearson correlation with an ECG channel ≥ heart_min_ecg_correlation. This is an additional AND gate, not independent ECG-only deletion. Without ECG, ICLabel alone is used; no ECG surrogate is constructed.
+threshold: at least one of Muscle, Eye, Heart, Line noise and Channel noise reaches artifact_threshold AND Brain ≤ brain_probability_max. Other is not removed automatically. With a usable real ECG, Heart-only candidates also require maximum absolute Pearson correlation with an ECG channel ≥ heart_min_ecg_correlation. ECG correlation is an additional condition for these candidates. If no usable ECG channel remains, ICLabel alone determines selection. The rule uses recorded ECG channels only.
 
 class_max: remove if Eye equals the maximum class probability; OR Brain ≤0.5 and any of Muscle, Line noise or Channel noise equals that maximum. Ties count. Heart/Other are not independently selected. artifact_threshold, brain_probability_max and ECG support are inactive.
 
 ## Epochs and BAD annotations
 
-purpose, task_name and epoch_mode are independent. Both rest and ERP default to continuous output. Explicit events passed to run activate event export when epoch_mode is none. auto QC uses trial-local screening for event epochs under either purpose, and continuous annotations for fixed epochs. Only local repair, not trial-local rejection, requires purpose=erp.
+purpose, task_name and epoch_mode are independent. Both rest and ERP default to continuous output. Explicit events passed to run activate event export when epoch_mode is none. auto QC uses trial-local screening for event epochs under either purpose, and continuous annotations for fixed epochs. Local repair requires purpose=erp.
 
 Event-window QC temporarily ignores only newly generated BAD_residual while checking actual event windows for peaks, peak-to-peak and relative noise. Original manual BAD, including pre-existing BAD_residual, still excludes overlapping trials. Continuous samples and annotations remain intact. Ordinary mne.Epochs(clean_raw, reject_by_annotation=True, ...) uses continuous BAD and may not match trial-local exports.
 
 ## Advanced ASR options
 
-Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the pipeline supplies cutoff and min_segment_seconds from asr_cutoff and min_training_seconds. Those two nested keys are ignored with an audit. Invalid nested keys/values use backend defaults. max_memory_mb also affects update boundaries, so it is not a purely cosmetic performance option.
+Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the pipeline supplies cutoff and min_segment_seconds from asr_cutoff and min_training_seconds. Those two nested keys are ignored with an audit. Invalid nested keys/values use backend defaults. Changing max_memory_mb can change update boundaries and numerical results.
 
 | Parameter | Type | Values / units | Meaning | Class default |
 |---|---|---|---|---|
 | `cutoff` | float | positive; use asr_cutoff | Burst cutoff, controlled at pipeline level. | `20.0` |
 | `reference_window` | float | seconds > 0 | Reference-selection window. | `1.0` |
 | `reference_max_bad_channels` | float | 0 ≤ fraction < 1 | Maximum bad-channel fraction in reference windows. | `0.075` |
-| `reference_tolerances` | tuple[float, float] | (lo, hi); lo < 0 < hi; lo can be -inf | Robust reference acceptance interval; supply -inf through Python rather than nonstandard JSON. | `(-inf, 5.5)` |
+| `reference_tolerances` | tuple[float, float] | (lo, hi); lo < 0 < hi; lo can be -inf | Robust reference acceptance interval. Use Python for -inf, which standard JSON cannot represent. | `(-inf, 5.5)` |
 | `calibration_window` | float | seconds > 0 | Calibration window. | `0.5` |
 | `overlap` | float | 0 ≤ fraction < 1 | Reference/calibration window overlap. | `0.66` |
 | `processing_window` | float / None | seconds > 0 / None | Effective window=max(requested or 0.5, 1.5 × usable EEG channels / sfreq). | `None` |
@@ -203,7 +203,7 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 
 ## Reporting controls
 
-These are runtime arguments, not additional PipelineConfig fields. run, epoch and resume default to report=True, with HTML rendered in a fresh subprocess. report=False collects bounded numeric material and writes one *_report_data.npz without drawing or HTML. The eegproc collector does not actively import Agg/font rendering; upstream MNE may still import Matplotlib. Complete immediate reports remove temporary material/logs; partial or failed reports retain recovery material and a log. report_status is completed, partial, failed or deferred, independent of processing status. Rendering uses at most two 300-second attempts; render_report returns complete/partial HTML and raises on failure, while data-processing APIs preserve their result if only reporting fails. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a completed combined report, never for partial, failed or deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
+Pass these controls as runtime arguments. run, epoch and resume default to report=True, with HTML rendered in a fresh subprocess. report=False collects bounded numeric material and writes one *_report_data.npz without drawing or HTML. The eegproc collector does not actively import Agg/font rendering; upstream MNE may still import Matplotlib. Complete immediate reports remove temporary material/logs; partial or failed reports retain recovery material and a log. report_status is completed, partial, failed or deferred, independent of processing status. Rendering uses at most two 300-second attempts; render_report returns complete/partial HTML and raises on failure, while data-processing APIs preserve their result if only reporting fails. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default. With keep_source_report=False, the source is deleted after the combined report completes. Partial, failed and deferred reports leave the source in place. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. Discovery uses file paths alone. The caller chooses the report that belongs to the recording.
 
 ## Complete CLI flags
 

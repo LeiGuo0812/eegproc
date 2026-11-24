@@ -31,7 +31,7 @@ clean_raw = result.raw
 print(result.status, result.outputs["quality_report"])
 ```
 
-Prepare EEG/EOG/ECG in volts, electrode coordinates in metres, and correct channel types, montage and event timing. Device conversion is handled separately by `eegproc.preparation.prepare_data`. The input Raw is not modified; original BAD annotations and auxiliary samples are retained.
+Prepare EEG/EOG/ECG in volts, electrode coordinates in metres, and correct channel types, montage and event timing. Device conversion is handled separately by `eegproc.preparation.prepare_data`. `run()` leaves the input Raw unchanged and retains its original BAD annotations and auxiliary samples in the output.
 
 For a task recording with stimulus annotations `"1"` and `"2"`:
 
@@ -61,7 +61,7 @@ All presets, including `eeglab`, request **1–100 Hz for ICA training**. Analys
 
 ## Epoch later and defer reports
 
-Use `epoch()` for an already preprocessed Raw. It performs only epoch construction and QC; it does not repeat filtering, ASR or ICA and does not require the original recording.
+Use `epoch()` for an already preprocessed Raw. It uses the cleaned recording directly for epoch construction and QC, reusing the results of filtering, ASR and ICA. The cleaned recording is the only required data product from preprocessing.
 
 ```python
 from eegproc import run, epoch, render_report
@@ -77,7 +77,7 @@ render_report(seg, "outputs/sub01_epochs/sub01_report.html")
 epochs = seg.epochs
 ```
 
-`run()`, `epoch()` and `resume()` default to `report=True`, with rendering isolated in a fresh subprocess. With `report=False`, no figures or HTML are produced; one `*_report_data.npz` stores bounded diagnostic material for later rendering. The eegproc collector does not import Agg or font rendering; upstream MNE operations may still import Matplotlib. No full original Raw is copied. `render_report()` accepts a result, an existing HTML, or a report-data package and uses the same isolated renderer. Report status is `completed`, `partial`, `failed` or `deferred`, separate from processing status. Incomplete rendering retains compact material and an error log for recovery.
+`run()`, `epoch()` and `resume()` default to `report=True`, with rendering isolated in a fresh subprocess. With `report=False`, one `*_report_data.npz` stores bounded diagnostic material for later rendering. Figures and HTML are deferred. The eegproc collector runs without importing Agg or font-rendering components. Upstream MNE operations may still import Matplotlib. The package omits a full copy of the original Raw. `render_report()` accepts a result, an existing HTML, or a report-data package and uses the same isolated renderer. Report status is `completed`, `partial`, `failed` or `deferred`, separate from processing status. Incomplete rendering retains compact material and an error log for recovery.
 
 `epoch()` reads BAD origins and global bad-channel information from the cleaned Raw/FIF. Input, manual and unknown BAD remain exclusions; event-window QC reevaluates only marked automatic residuals. It automatically looks for the previous HTML or report-data package; use `source_report="path/to/report.html"` to select one explicitly. Missing or unreadable reports produce a warning and an independent epoch report. Source HTML is kept by default. See [standalone epoching and reports](docs/en/usage.md#standalone-epoching).
 
@@ -93,7 +93,7 @@ python examples/batch_process.py manifest.csv --output outputs/cohort --workers 
 python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-The manifest and directory layout are described in [Complete usage](docs/en/usage.md#executable-examples). Keep the manifest rows unchanged when resuming. Completed recordings are skipped; deferred, partial or failed reports are retried from saved report data, without repeating preprocessing. Failed or incomplete scientific processing needs a new output directory after the cause is resolved. The example does not automatically retry scientific computation.
+The manifest and directory layout are described in [Complete usage](docs/en/usage.md#executable-examples). Keep the manifest rows unchanged when resuming. `--resume` skips completed recordings and retries deferred, partial or failed reports from saved report data without repeating preprocessing. For failed or incomplete scientific processing, resolve the cause, then start a separate run in a new output directory.
 
 `--workers` defaults to 1 and controls concurrent recordings; every worker uses `n_threads=1` and sets numerical thread variables before importing EEG libraries. `--timeout` defaults to 86400 seconds per recording; a timed-out worker and its report child processes are terminated together. Start with one or two workers and measure peak memory before increasing concurrency. Inspect both processing and report status in `batch_summary.json`. Ctrl+C stops active worker trees, cancels queued rows and saves the recovery summary. A small `batch_result.json` per recording supports recovery; failed attempts retain logs and report material. Completed reports remove their batch-generated package and worker log.
 

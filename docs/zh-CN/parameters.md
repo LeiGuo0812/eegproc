@@ -6,7 +6,7 @@
 
 ## Python 配置方法
 
-优先级：**预设默认值 < 可选 JSON 文件 < config 对象/字典 < run 显式关键字参数**。PipelineConfig 是完整解析后的不可变对象，作为配置源时全部字段均视为显式值。切换目的并重新获取默认值时，应新建配置，而不是只改已有配置的 purpose。
+优先级：**预设默认值 < 可选 JSON 文件 < config 对象/字典 < run 显式关键字参数**。PipelineConfig 是完整解析后的不可变对象，作为配置源时全部字段均视为显式值。用目标 purpose 新建配置，即可获得该用途的默认值。
 
 ```python
 from dataclasses import asdict
@@ -29,7 +29,7 @@ print(config.adjustments)
 
 | 参数 | 类型 | 有效值 / 单位 | 说明 | standard/rest | standard/erp | eeglab/rest | eeglab/erp |
 |---|---|---|---|---|---|---|---|
-| `preset` | str | standard / eeglab | 同一流程的参数默认值；两者均请求 1–100 Hz ICA 训练，eeglab 近似对齐原脚本的部分设置，不代表 MATLAB 数值复现。 | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
+| `preset` | str | standard / eeglab | 同一流程的参数默认值。两者均请求 1–100 Hz ICA 训练。eeglab 近似采用原脚本的部分设置，计算结果可能与 MATLAB 不同。 | `'standard'` | `'standard'` | `'eeglab'` | `'eeglab'` |
 | `filter_method` | str | mne_fir / eeglab_fir / off | 分析与训练数据的 FIR 实现；off 跳过显式带通滤波。 | `'mne_fir'` | `'mne_fir'` | `'eeglab_fir'` | `'eeglab_fir'` |
 | `filter_order` | int | even int ≥ 2; samples | 仅 eeglab_fir 使用；MNE FIR 自行确定滤波长度。 | `15000` | `15000` | `15000` | `15000` |
 | `filter_position` | str | after_reference | 目前仅支持在参考处理之后滤波。 | `'after_reference'` | `'after_reference'` | `'after_reference'` | `'after_reference'` |
@@ -39,7 +39,7 @@ print(config.adjustments)
 | `line_p_value` | float | 0 < p < 1 | spectrum_fit 显著性阈值；notch/off 时不使用。 | `0.05` | `0.05` | `0.05` | `0.05` |
 | `channel_method` | str | pyprep / eegprep / off | 坏导检测器；eegprep 需可选依赖；off 仍保留输入坏导信息。 | `'pyprep'` | `'pyprep'` | `'eegprep'` | `'eegprep'` |
 | `flatline_seconds` | float | seconds > 0 | EEGPrep 兼容检测器的平直时长阈值。 | `5.0` | `5.0` | `5.0` | `5.0` |
-| `channel_correlation` | float | 0 < fraction < 1 | EEGPrep 兼容相关阈值，不替代 PyPREP 内部参数。 | `0.8` | `0.8` | `0.8` | `0.8` |
+| `channel_correlation` | float | 0 < fraction < 1 | EEGPrep 兼容检测器的相关阈值。PyPREP 使用自身设置。 | `0.8` | `0.8` | `0.8` | `0.8` |
 | `channel_broken_fraction` | float | 0 < fraction < 1 | EEGPrep 兼容检测中异常窗口比例。 | `0.4` | `0.4` | `0.4` | `0.4` |
 | `reference` | str | average / unchanged | 初始及启用后的最终参考方法；unchanged 均不改变参考。 | `'average'` | `'average'` | `'average'` | `'average'` |
 | `interpolate_bads` | bool | bool | 总插值开关；False 同时关闭 ASR 前插值。 | `True` | `True` | `True` | `True` |
@@ -50,30 +50,30 @@ print(config.adjustments)
 | `ica_enabled` | bool | bool | 启用 ICA、ICLabel 与成分处理；False 时复核/人工选择失效。 | `True` | `True` | `True` | `True` |
 | `ica_mode` | str | auto / review / manual | auto 应用建议；review 在减除前暂停；manual 应用完整人工列表。 | `'auto'` | `'auto'` | `'auto'` | `'auto'` |
 | `ica_exclude` | tuple / None | tuple[int] / None; zero-based | 完整删除列表，0 起始；[] 全保留；auto 下传列表会转 manual；无效或越界编号记录，不用自动建议替代。 | `None` | `None` | `None` | `None` |
-| `ica_rule` | str | threshold / class_max | 自动筛选规则见下文；不改变 ICA 拟合。 | `'threshold'` | `'threshold'` | `'class_max'` | `'class_max'` |
+| `ica_rule` | str | threshold / class_max | 选择拟合后自动剔除成分的规则，见下文。 | `'threshold'` | `'threshold'` | `'class_max'` | `'class_max'` |
 | `rank_method` | str | relative / covariance | relative：奇异值大于 max(机器精度容差, 最大奇异值×1e-6)；covariance：矩阵秩与大于 1e-7 µV² 的协方差特征值数的较小值。 | `'relative'` | `'relative'` | `'covariance'` | `'covariance'` |
 | `review_author` | str | str | 初次人工决策复核人标签。 | `''` | `''` | `''` | `''` |
 | `review_reason` | str | str | 初次人工决策理由。 | `''` | `''` | `''` | `''` |
-| `purpose` | str | rest / erp | 分析目的默认值，不单独开启分段。 | `'rest'` | `'erp'` | `'rest'` | `'erp'` |
+| `purpose` | str | rest / erp | 选择分析默认值。分段输出单独设置。 | `'rest'` | `'erp'` | `'rest'` | `'erp'` |
 | `task_name` | str / None | str / None; 1–100 characters | 任务名称元数据，独立于 purpose、文件名和事件筛选；无首尾空格或控制字符。 | `'rest'` | `None` | `'rest'` | `None` |
 | `ica_backend` | str | mne | 支持的 ICA 接口；求解器由 ica_method 指定。 | `'mne'` | `'mne'` | `'mne'` | `'mne'` |
 | `highpass` | float | Hz > 0; < lowpass | 分析高通边缘，受已有采集滤波限制。 | `0.5` | `0.1` | `0.5` | `0.5` |
 | `lowpass` | float | Hz > highpass; < Nyquist | 分析低通边缘，必要时根据输入限制下调。 | `80.0` | `30.0` | `100.0` | `100.0` |
 | `training_highpass` | float | Hz > 0; < training_lowpass | ICA 训练高通边缘；所有预设默认 1 Hz。允许显式覆盖，受输入限制产生的调整会记录。 | `1.0` | `1.0` | `1.0` | `1.0` |
-| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA 训练低通边缘；所有预设默认 100 Hz。请求 1–100 Hz 无法恢复输入中不存在的频率。 | `100.0` | `100.0` | `100.0` | `100.0` |
-| `line_frequency` | float / None | Hz > 0 / None | 已知工频，通常为 50 或 60；处理不超过 min(100, sfreq/2−1) Hz 的谐波；None 关闭，不自动估计。 | `50.0` | `50.0` | `50.0` | `50.0` |
+| `training_lowpass` | float | Hz > training_highpass; < Nyquist | ICA 训练低通边缘，所有预设默认 100 Hz。请求的 1–100 Hz 频段受限于输入保留的频率。 | `100.0` | `100.0` | `100.0` | `100.0` |
+| `line_frequency` | float / None | Hz > 0 / None | 填入已知工频，通常为 50 或 60 Hz。处理不超过 min(100, sfreq/2−1) Hz 的谐波。None 关闭去工频。 | `50.0` | `50.0` | `50.0` | `50.0` |
 | `artifact_threshold` | float | 0.5 ≤ probability ≤ 1 | 仅 threshold：肌电/眼电/心电/工频/通道噪声中最高概率的最低要求。 | `0.9` | `0.9` | `0.9` | `0.9` |
 | `brain_probability_max` | float | 0 ≤ probability ≤ 0.5 | 仅 threshold：删除时允许的 Brain 概率上限。 | `0.2` | `0.2` | `0.2` | `0.2` |
 | `asr_cutoff` | float / None | positive / None | 爆发阈值；None 关闭；rest 和 ERP 默认均为 20。 | `20.0` | `20.0` | `20.0` | `20.0` |
 | `asr_backend` | str | mne_native | 独立兼容 MNE 的 ASR；运行时不依赖 ASRpy。 | `'mne_native'` | `'mne_native'` | `'mne_native'` | `'mne_native'` |
 | `asr_options` | dict / None | dict / None | 高级覆盖见下表；cutoff/min_segment_seconds 使用顶层参数。 | `None` | `None` | `None` | `None` |
 | `seed` | int | int; 0 ≤ seed < 2**32 | ICA 与适用的检测/修复阶段的随机种子。 | `20261018` | `20261018` | `20261018` | `20261018` |
-| `n_threads` | int | int ≥ 1 | 数值线程数，不自动调度记录级批处理。 | `1` | `1` | `1` | `1` |
+| `n_threads` | int | int ≥ 1 | 数值计算的线程上限。记录级并行数单独设置。 | `1` | `1` | `1` | `1` |
 | `ica_max_iter` | int | int ≥ 1 | 最大迭代数；报告记录收敛和达到上限情况。 | `1000` | `1000` | `4096` | `4096` |
-| `ica_tolerance` | float | positive | Picard tol 或 Infomax w_change；相同数值不代表相同停止行为。 | `1e-07` | `1e-07` | `1e-07` | `1e-07` |
+| `ica_tolerance` | float | positive | 所选求解器的容差，Picard 使用 tol，Infomax 使用 w_change。两者各用自己的停止准则。 | `1e-07` | `1e-07` | `1e-07` | `1e-07` |
 | `bad_channel_fraction_limit` | float | 0 < fraction < 1 | 全局坏导比例质控阈值，由 policy 决定报告或停止。 | `0.3` | `0.3` | `0.3` | `0.3` |
 | `bad_channel_policy` | str | auto / report / stop | report 在仍可计算时跑完；stop 在坏导超限时停止；auto 对当前 mne_native 后端等于 report；始终要求至少 8 个可用 EEG 导联。 | `'report'` | `'report'` | `'report'` | `'report'` |
-| `min_training_seconds` | float | seconds > 0 | 最短训练与 ASR 片段时长，不代表校准质量已充分。 | `20.0` | `20.0` | `20.0` | `20.0` |
+| `min_training_seconds` | float | seconds > 0 | 训练与 ASR 片段的最短可用时长。校准质量需另行评估。 | `20.0` | `20.0` | `20.0` | `20.0` |
 | `gross_peak_uv` | float | µV > 0 | 严重训练伪迹绝对峰值阈值。 | `500.0` | `500.0` | `500.0` | `500.0` |
 | `residual_peak_uv` | float | µV > 0 | 残留绝对峰值阈值，也是默认分段阈值。 | `150.0` | `150.0` | `150.0` | `150.0` |
 | `residual_ptp_uv` | float | µV > 0 | 残留峰峰值阈值，也是默认分段阈值。 | `200.0` | `200.0` | `200.0` | `200.0` |
@@ -103,7 +103,7 @@ print(config.adjustments)
 | `report_dpi` | int | int ≥ 60; dpi | 图片分辨率，越大则 HTML 越大。 | `100` | `100` | `100` | `100` |
 | `report_max_width` | int | int ≥ 600; pixels | 报告内图片最大像素宽度。 | `1200` | `1200` | `1200` | `1200` |
 | `report_psd_windows` | int | int ≥ 1 | 报告 PSD 抽取的代表性窗口数量上限。 | `30` | `30` | `30` | `30` |
-| `report_psd_window_seconds` | float / None | seconds > 0 / None | None 使用内部有界抽样；报告 PSD 用于诊断，不是正式分析估计。 | `None` | `None` | `None` | `None` |
+| `report_psd_window_seconds` | float / None | seconds > 0 / None | None 在规定范围内自动选取采样窗长度。报告中的 PSD 使用抽样窗进行质量检查。 | `None` | `None` | `None` | `None` |
 
 ## 依赖处理、自动修正与停止边界
 
@@ -111,31 +111,31 @@ print(config.adjustments)
 - 频段受已有采集滤波与 Nyquist 限制；不恢复已丢失频率，不隐式重采样。采样率 ≤80 Hz 时停用当前 ASR；<100 Hz 时停用当前 ICA/ICLabel，均记录原因。
 - ICA 关闭则取消复核/人工选择；review 在减除前暂停；无效 manual 列表保留全部成分并要求复核，越界编号被去除，resume 也采用这一规则。完整生效列表与调整均被记录。断点/输入哈希，以及导入选择 JSON 的模型身份和 reviewed=true 仍严格校验。
 - 总插值关闭时不执行 ASR 前插值；两处插值均关闭时总开关也关闭。不适用的局部分段修复被关闭并记录。
-- 缺失或无效事件、未知条件、重复或越界样本、无法完成的事件窗可跳过分段并继续连续处理；检查 epoch_resolution 及实际输出，连续处理完成不代表已输出试次。
-- report 策略仅放宽质量阈值停止规则，不保证所有输入均成功。文件不存在、输出冲突、依赖缺失、无效采集元数据、缺失必要坐标、样本或秩不可用、断点损坏或身份不匹配仍可能停止，不会用猜测数据替代。
+- 缺失或无效事件、未知条件、重复或越界样本、无法完成的事件窗可跳过分段并继续连续处理；在 epoch_resolution 和输出路径中查看分段状态。
+- report 策略下，坏导比例超限后只要数据仍满足计算要求，流程就继续。文件不存在、输出冲突、依赖缺失、采样或滤波元数据无效、必要坐标缺失、样本或秩不可用、断点损坏或身份不匹配时仍可能停止。流程会报告实际错误，无替代数据。
 
 ## ICA 精确规则
 
-threshold：Muscle、Eye、Heart、Line noise、Channel noise 至少一类达到 artifact_threshold，并且 Brain ≤ brain_probability_max。Other 不自动删除。有可用真实 ECG 时，仅由 Heart 达标的候选还要求与至少一个 ECG 通道的最大绝对 Pearson 相关 ≥ heart_min_ecg_correlation。这是额外 AND 门控，不是单靠 ECG 独立删除。无 ECG 时仅按 ICLabel，不构造替代 ECG。
+threshold：Muscle、Eye、Heart、Line noise、Channel noise 至少一类达到 artifact_threshold，并且 Brain ≤ brain_probability_max。Other 不自动删除。有可用真实 ECG 时，仅由 Heart 达标的候选还要求与至少一个 ECG 通道的最大绝对 Pearson 相关 ≥ heart_min_ecg_correlation。ECG 相关性是这类候选的附加条件。没有可用 ECG 通道时，只按 ICLabel 筛选。ECG 辅助只使用实际采集的 ECG 通道。
 
 class_max：Eye 等于该 IC 最大类别概率时删除；或 Brain ≤0.5 且 Muscle、Line noise、Channel noise 中任意一类等于最高概率时删除。并列最高算匹配；不单独删除 Heart/Other；不使用 artifact_threshold、brain_probability_max 或 ECG 相关门控。
 
 ## 分段与 BAD
 
-purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续数据；向 run 传显式 events 会在 epoch_mode=none 时开启事件分段。auto QC 对两种 purpose 的事件分段均启用试次局部筛查，对固定窗使用连续标注排除；只有局部修复要求 purpose=erp，单纯试次局部排除不要求。
+purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续数据；向 run 传显式 events 会在 epoch_mode=none 时开启事件分段。auto QC 对两种 purpose 的事件分段均启用试次局部筛查，对固定窗使用连续标注排除；局部修复要求 purpose=erp。
 
 事件窗 QC 仅暂时忽略本次新增 BAD_residual，按真实事件窗检查峰值、峰峰值与相对噪声。原始人工 BAD，包括原有同名 BAD_residual，仍排除重叠试次。连续数据及标注不因此删除。普通 mne.Epochs(clean_raw, reject_by_annotation=True, ...) 按连续 BAD 排除，不一定与本流程试次局部 QC 的导出结果相同。
 
 ## 高级 ASR 参数
 
-通过 asr_options 字典传入。下表为独立 ASRConfig 默认值；流程由 asr_cutoff、min_training_seconds 控制 cutoff、min_segment_seconds。后两个键若写入嵌套选项，会忽略并记录。无效键或值退回后端默认值。max_memory_mb 同时影响更新边界，并非纯性能开关。
+通过 asr_options 字典传入。下表为独立 ASRConfig 默认值；流程由 asr_cutoff、min_training_seconds 控制 cutoff、min_segment_seconds。后两个键若写入嵌套选项，会忽略并记录。无效键或值退回后端默认值。max_memory_mb 可影响更新边界和计算结果。
 
 | 参数 | 类型 | 有效值 / 单位 | 说明 | 类默认值 |
 |---|---|---|---|---|
 | `cutoff` | float | positive; use asr_cutoff | 爆发阈值，由顶层控制。 | `20.0` |
 | `reference_window` | float | seconds > 0 | 参考段筛选窗口。 | `1.0` |
 | `reference_max_bad_channels` | float | 0 ≤ fraction < 1 | 参考窗口坏导比例上限。 | `0.075` |
-| `reference_tolerances` | tuple[float, float] | (lo, hi); lo < 0 < hi; lo can be -inf | 稳健参考段接收区间；-inf 用 Python 设置，避免非标准 JSON。 | `(-inf, 5.5)` |
+| `reference_tolerances` | tuple[float, float] | (lo, hi); lo < 0 < hi; lo can be -inf | 稳健参考段接收区间。标准 JSON 无法表示 -inf，请通过 Python 设置。 | `(-inf, 5.5)` |
 | `calibration_window` | float | seconds > 0 | 校准窗口。 | `0.5` |
 | `overlap` | float | 0 ≤ fraction < 1 | 参考与校准窗重叠比例。 | `0.66` |
 | `processing_window` | float / None | seconds > 0 / None | 实际窗口=max(指定值或0.5, 1.5×可用EEG导联数/sfreq)。 | `None` |
@@ -203,7 +203,7 @@ prepare_data(source, *, output_fif=None, channel_types=None, rename=None, drop=(
 
 ## 报告控制
 
-以下为运行参数，不增加 PipelineConfig 字段。run、epoch、resume 均默认 report=True，HTML 由全新子进程渲染。report=False 采集有限数值素材并写一个 *_report_data.npz，不绘图、不写 HTML。eegproc 采集模块不主动导入 Agg／字体渲染组件；MNE 自身仍可能导入 Matplotlib。完整即时报告清理临时素材和日志；部分完成或失败时保留恢复素材及日志。report_status 区分 completed、partial、failed、deferred，与处理状态分开。渲染最多尝试两次，每次 300 秒；render_report 对完整／部分 HTML 返回路径，失败时抛异常，数据处理 API 在仅报告失败时保留处理结果。epoch 的来源报告可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并报告 completed 后删除旧 HTML，部分、失败或延迟时保留。查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
+以下选项通过运行参数传入。run、epoch、resume 均默认 report=True，HTML 由全新子进程渲染。report=False 采集有限数值素材并写一个 *_report_data.npz，不绘图、不写 HTML。eegproc 采集模块不主动导入 Agg／字体渲染组件；MNE 自身仍可能导入 Matplotlib。完整即时报告清理临时素材和日志；部分完成或失败时保留恢复素材及日志。report_status 区分 completed、partial、failed、deferred，与处理状态分开。渲染最多尝试两次，每次 300 秒；render_report 对完整／部分 HTML 返回路径，失败时抛异常，数据处理 API 在仅报告失败时保留处理结果。epoch 的来源报告可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并报告 completed 后删除旧 HTML，部分、失败或延迟时保留。查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。查找依据为文件路径。由使用者选择与记录对应的报告。
 
 ## 全部 CLI 参数
 

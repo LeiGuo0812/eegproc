@@ -1,10 +1,10 @@
 # Independent MNE ASR
 
 `mne_asr` is a local, offline Euclidean Artifact Subspace Reconstruction
-implementation with native `mne.io.BaseRaw` input/output. It is not an official
-MNE project and is not a new statistical ASR method. The numerical routines are
-derived from EEGPrep 0.4.0's Python implementation of EEGLAB ASR; provenance,
-original source hashes and licenses accompany the code.
+implementation with native `mne.io.BaseRaw` input/output. eegproc maintains this implementation outside the official MNE project. The
+numerical routines implement the existing ASR method and derive from EEGPrep 0.4.0's
+Python implementation of EEGLAB ASR. Provenance, original source hashes and licenses
+accompany the code.
 
 Runtime dependencies: NumPy, SciPy, MNE. Neither EEGPrep, ASRpy nor MATLAB is
 imported or required. There are no global monkey patches or EEGLAB dictionaries.
@@ -29,7 +29,7 @@ clean.save("asr_raw.fif", fmt="double", overwrite=True)
 
 The function independently calibrates and processes each usable continuous span.
 BAD, EDGE and boundary annotations split the signal. Bad and short spans are
-preserved, never silently deleted or joined. Original annotations, sample grid,
+preserved as separate parts of the recording. Original annotations, sample grid,
 absolute time, electrode positions, projections and nonselected channel samples
 are retained. A channel-scoped BAD conservatively blocks the whole multichannel
 span. No reconstructed data are automatically marked BAD.
@@ -67,18 +67,19 @@ from `clean_asr_raw`'s per-span recalibration when BAD splits are present.
   Raw and calibration arrays are loaded in memory. Changing the budget can change
   reconstruction update boundaries and therefore numerical output.
 - Selected calibration shorter than 30 s is flagged. Spans under 20 s are skipped
-  by default and reported. Those are processing policies, not evidence that every
-  retained calibration or trial is suitable for scientific inference.
+  by default and reported. Use these processing rules to identify calibrations and
+  trials for review against the study's own quality criteria.
 - Finite input is required outside blocked spans. Flat reference channels and
   numerical failures raise errors. There is no all-data calibration fallback or
   fallback to another backend. Output RMS amplification over 100x is a numerical
   catastrophe guard, not a physiological artifact threshold.
-- Sampling rates must exceed 80 Hz for this spectral-shaping curve. Current local
-  regression tests include 128, 250.5, 256 and 512 Hz. Dependency lower bounds are
-  installation requirements, not a claim that every version combination is tested.
+- Sampling rates must exceed 80 Hz for this spectral-shaping curve. Local
+  regression tests include 128, 250.5, 256 and 512 Hz. The dependency lower bounds
+  specify install requirements. Test coverage is specific to the versions used in the tests.
 - The algorithm does not high-pass filter, remove line noise, rereference,
   interpolate channels, classify ICs or determine ERP trial rejection.
-- No online/streaming equivalence or bitwise MATLAB identity is claimed.
+- The compatibility profile targets offline processing. Online/streaming equivalence
+  and bitwise agreement with MATLAB are outside its scope.
 
 `ASRConfig` exposes reference/calibration/processing settings for explicit studies.
 If `config` is supplied it takes precedence over the convenience `cutoff` argument.

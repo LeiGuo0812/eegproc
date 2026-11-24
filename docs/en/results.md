@@ -30,7 +30,7 @@ There is no `original_raw.fif`, `preview_raw.fif`, full training snapshot, or im
 | `awaiting_ica_review` / Awaiting ICA selection | ICA is fitted, subtraction is pending | Inspect ICs and resume with a complete exclusion list. `result.raw` is `None`. |
 | `failed` / Failed | Processing raised an error | Inspect the error/stage; partial artifacts do not establish completion. |
 
-Processing, delivery and report-generation status are also recorded separately. A usable FIF can exist even if a later report or epoch stage fails. A report existing on disk does not guarantee every requested stage completed.
+Check processing, delivery and report-generation status separately. A usable FIF may already be available when a later report or epoch stage fails. Use the recorded statuses to identify which stages completed.
 
 `report_status="deferred"` means reporting was deliberately postponed; use the saved report-data package to generate HTML. A standalone epoch request without usable events has a skipped epoch resolution; an all-rejected request has zero retained trials and no epoch FIF. In both cases, the HTML or package records the reason. `.epochs` exposes the epoch result, while `.outputs` lists only files actually produced.
 
@@ -43,7 +43,7 @@ Processing, delivery and report-generation status are also recorded separately. 
 | `failed` | Rendering exited, timed out or could not commit HTML | Use the retained package/log to retry to a fresh target. |
 | `deferred` | HTML was deliberately postponed | Call `render_report()` when needed. |
 
-Rendering runs in a fresh subprocess, with at most two attempts of 300 seconds. The data result remains available when only rendering fails. Incomplete rendering retains a compact `*_report_data.npz` and `*_report_errors.log`; complete immediate reports remove temporary rendering files. A `render_report()` source package is kept unchanged. Inspect `report_execution` for attempts and exit codes. Batch runs also write `batch_summary.json` and a small per-recording `batch_result.json` for recovery; these are not extra algorithm-stage snapshots.
+Rendering runs in a fresh subprocess, with at most two attempts of 300 seconds. The data result remains available when only rendering fails. Incomplete rendering retains a compact `*_report_data.npz` and `*_report_errors.log`; complete immediate reports remove temporary rendering files. A `render_report()` source package is kept unchanged. Inspect `report_execution` for attempts and exit codes. Batch runs write `batch_summary.json` and a small per-recording `batch_result.json` to track progress and resume delivery.
 
 ## Read the report in this order
 
@@ -51,17 +51,17 @@ Rendering runs in a fresh subprocess, with at most two attempts of 300 seconds. 
 
 Confirm subject, task name, analysis purpose, duration, sampling rate, EEG channel count and analysis/ICA bands. A wrong task label is a metadata issue; a wrong analysis band can change the scientific measurement. Read the **Parameter adjustments** table, especially any changes to filters, epoching, missing optional backends or manual IC lists.
 
-The **Output BAD fraction** measures the proportion of samples covered by the workflow's combined BAD/boundary mask. Overlapping intervals are not double-counted. **Retained seconds** is the corresponding duration outside that mask; it is not the duration of a physically shortened FIF. ICA excluded count measures removed components, not removed channels or a percentage of brain signal. Epoch retention uses the requested/selected input events as its denominator, not every event in the original recording.
+The **Output BAD fraction** is the proportion of samples covered by the combined BAD/boundary mask, counting overlapping intervals once. **Retained seconds** is the duration outside that mask. The FIF keeps the full sample grid. The ICA excluded count tallies removed components. Epoch retention uses the selected input events as its denominator.
 
-The default bad-channel policy is `report`: finish viable processing and report excessive burden for human judgment. The default 30% bad-channel limit and residual amplitude limits are engineering QC settings, not universal biological thresholds. A separate observation is raised when more than 20% of EEG channels require global interpolation. Record the actual burden, location and research consequences instead of automatically accepting a threshold-adjacent recording.
+The default bad-channel policy `report` completes viable processing and flags excessive burden for review. Use the default 30% bad-channel limit and residual amplitude limits as QC settings alongside study-specific acceptance criteria. The report adds a separate observation when more than 20% of EEG channels require global interpolation. Record the burden, location and consequences for the analysis when deciding whether to accept a recording near a threshold.
 
 ### 2. EEG preprocessing: waveforms and overall PSD
 
-Waveform panels normally use up to three **4-second** windows: a representative amplitude window, the largest input peak-to-peak window, and the largest output peak-to-peak window. Coincident selections can produce fewer panels. These are deliberately targeted samples, not an exhaustive visual audit of the whole recording.
+Waveform panels normally use up to three **4-second** windows: a representative amplitude window, the largest input peak-to-peak window, and the largest output peak-to-peak window. The report shows fewer panels when these selections overlap.
 
-Before/after traces use the same channels and samples. For display, both use the average of originally usable EEG channels and each window has its median removed. This display operation does not change saved data. Yellow shading indicates input BAD, red indicates output BAD, and an asterisk identifies a bad channel. Check whether bursts and steps declined, whether the residual worst window remains problematic, and whether rhythmic/slow activity was plausibly preserved. A flatter trace alone is not evidence of better neural recovery.
+Before/after traces use the same channels and samples. For display, both use the average of originally usable EEG channels and each window has its median removed. This display operation does not change saved data. Yellow shading indicates input BAD, red indicates output BAD, and an asterisk identifies a bad channel. Use the bursts, steps, worst residual window and rhythmic or slow activity to assess artifact reduction and signal preservation alongside overall amplitude.
 
-The paired overall PSD uses the same input-good channels and time windows. It excludes input BAD windows but intentionally does **not** exclude newly flagged output BAD from just the after trace; otherwise the comparison would also change the sample set. Lines are the median across channels, shading is the interquartile range. Power is shown in dB relative to µV²/Hz. Dashed lines mark analysis filter edges, dotted lines line frequencies.
+The paired overall PSD uses the same input-good channels and time windows. The comparison excludes input BAD windows from both traces and retains newly flagged output BAD windows in both so they use the same sample set. Lines are the median across channels, shading is the interquartile range. Power is shown in dB relative to µV²/Hz. Dashed lines mark analysis filter edges, dotted lines line frequencies.
 
 PSD windows are separate from the 4-second waveform setting. By default their requested duration is `min(20, max(4, 2 / highpass))` seconds: 4 seconds for rest and 20 seconds for ERP, shortened if needed. The **Signal sampling** disclosure records actual windows and frequency resolution. The report PSD is a sampled diagnostic; calculate study PSD on the intended accepted duration for analysis.
 
@@ -69,27 +69,27 @@ PSD windows are separate from the 4-second waveform setting. By default their re
 
 This comparison is captured immediately before and after the line-cleaning stage, before band filtering, ASR and ICA. It therefore separates line removal from the later low-pass filter. The same channels and short windows are used in each pair, in the recorded reference.
 
-Each target frequency shows ±5 Hz of spectrum and integrated band power near the target (bins within ±1 Hz). Reduction is calculated per channel as `10*log10(before_power/after_power)` and then summarized by the median. It is not generally the logarithm of the ratio of the two displayed medians.
+Each target frequency shows ±5 Hz of spectrum and integrated band power near the target (bins within ±1 Hz). The reported reduction is the median across channels of `10*log10(before_power/after_power)`. This channel-wise summary can differ from the reduction computed using the two displayed power medians.
 
 - Positive reduction: less power in that band after line cleaning.
 - Near zero: little measurable change, possibly because little line noise was present.
 - Negative reduction or large neighboring changes: inspect the stage and window selection.
 
-Large reduction measures removal around the target; it does not establish that all removed energy was interference. Check adjacent frequencies and any narrow-band neural hypothesis. “Disabled”, “not applied” or “unavailable” is distinct from zero reduction. The method, target frequencies and sampling details are expandable below the figure.
+Reduction summarizes the change in power around the target frequency. Check adjacent frequencies and consider neural activity in that band when interpreting the reduction. “Disabled”, “not applied” or “unavailable” is distinct from zero reduction. The method, target frequencies and sampling details are expandable below the figure.
 
 ### 4. Channels, annotations and ASR
 
-Use the scalp/channel display and **Channel table** to identify input bad channels, automatically detected channels, interpolation and remaining bad status. A cluster of neighboring bad electrodes can compromise a local effect despite a modest overall fraction. Interpolation estimates missing signals from neighbors; it does not add independent spatial information, and the resulting rank matters for later source/covariance analysis.
+Use the scalp/channel display and **Channel table** to identify input bad channels, automatically detected channels, interpolation and remaining bad status. A cluster of neighboring bad electrodes can compromise a local effect despite a modest overall fraction. Interpolation estimates missing signals from neighbors using the available spatial information. Account for the resulting rank in source or covariance analysis.
 
-The annotation timeline and table show where exclusions occur. **ASR and channel detection** contains backend diagnostics, reference/calibration information, segment handling and processing flags. ASR changes large transient subspaces rather than deleting continuous samples. A large corrected fraction is a prompt to review waveforms and the reference data; it is not a direct percentage of artifact removed or brain signal lost.
+The annotation timeline and table show where exclusions occur. **ASR and channel detection** contains backend diagnostics, reference/calibration information, segment handling and processing flags. ASR reconstructs large transient subspaces and preserves the continuous sample grid. The corrected fraction describes how much of the recording was corrected. Review waveforms and reference data to assess the effects on artifacts and brain signals.
 
 ### 5. ICA
 
 All fitted components are shown in a dense grid with topography and PSD underneath. **Red component text means the component was excluded in the saved result.** Pending review labels describe a decomposition not yet applied. Clicking a map opens activation, all seven class probabilities and the automatic proposal. The probability/decision table distinguishes the automatic proposal from the final choice.
 
-Inspect candidate eye components for frontal maps and blink/saccade-like activity; muscle candidates for focal/peripheral maps and broadband high-frequency power; line-noise candidates for narrow spectral peaks; heart candidates for rhythmic activity and the recorded ECG support decision. These are review cues, not a replacement classifier. IC activation and PSD use arbitrary component units; topographies are normalized per component and cannot be used to compare absolute amplitudes across ICs.
+Inspect candidate eye components for frontal maps and blink/saccade-like activity; muscle candidates for focal/peripheral maps and broadband high-frequency power; line-noise candidates for narrow spectral peaks; heart candidates for rhythmic activity and the recorded ECG support decision. Use these cues alongside the classifier. IC activation and PSD use arbitrary component units. Each topography is normalized separately, so compare spatial patterns across ICs.
 
-Also inspect rank, iterations, iteration-limit observations and available training samples relative to rank squared. A convincing class label does not repair an unstable decomposition. The displayed PSD/activation is a bounded training preview, not a complete recording of component activity.
+Assess decomposition stability using rank, iterations, iteration-limit observations and training samples relative to rank squared. The displayed PSD and activation use a bounded preview of the training data.
 
 The **Exclude** checkboxes, including those in details, define the *next* exclusion list. Editing them does not change the red labels or plots describing the saved result. Download the selection and [resume from the checkpoint](usage.md#ica-review-and-continuation) to apply it.
 
@@ -97,9 +97,9 @@ The **Exclude** checkboxes, including those in details, define the *next* exclus
 
 The bar plot and table show each condition's input count, annotation/boundary rejections, additional QC rejections and retained count. The detailed event table lists original event index/sample, condition and rejection reason. Compare conditions and participants: unequal loss can create differential precision or selection bias even when total retention looks good.
 
-Event-window QC preserves input manual BAD and tests the actual requested event window after setting aside only newly generated `BAD_residual`. Fixed-window/default annotation QC instead uses the continuous BAD decision. Optional local repair is reported separately and changes epochs only. Review retention together with ERP shape and residual artifacts; maximizing trial count is not the sole objective.
+Event-window QC preserves input manual BAD and tests the actual requested event window after setting aside only newly generated `BAD_residual`. Fixed-window/default annotation QC instead uses the continuous BAD decision. Optional local repair is reported separately and changes epochs only. Review trial retention, ERP shape and residual artifacts together.
 
-The same rules apply when `epoch()` is called later. Original and unknown BAD are not released solely because their description is `BAD_residual`; only marked automatic residuals are eligible for event-window reevaluation. A warning about missing legacy origin information means conservative annotation handling is in use. A warning about a missing source report concerns report reuse, not repeated denoising. A combined report reuses the original preprocessing section as its historical record and adds the current epoch results; it does not redraw old continuous plots to incorporate later manual annotations.
+The same rules apply when `epoch()` is called later. Event-window QC reevaluates only marked automatic residuals. Original BAD and BAD of unknown origin remain exclusions, even if labeled `BAD_residual`. A warning about missing legacy origin information means conservative annotation handling is in use. A warning about a missing source report means the previous report cannot be reused. A combined report keeps the original preprocessing section and continuous plots as recorded and adds the current epoch results. Later manual annotations are applied during epoching.
 
 ### 7. Methods, References and About
 
@@ -107,7 +107,7 @@ The same rules apply when `epoch()` is called later. Original and unknown BAD ar
 
 ## What does continuous BAD do?
 
-`BAD_residual` is an annotation marking a time interval with residual problems. It does **not** delete samples, set them to zero, or apply another denoising transform. Time, sample indices and auxiliary data remain aligned.
+`BAD_residual` marks a time interval with residual problems. The annotation leaves sample values and counts intact, and preserves the alignment of time, sample indices and auxiliary data.
 
 Downstream MNE routines decide how to use these labels. Ordinary `mne.Epochs(..., reject_by_annotation=True)` rejects trials overlapping BAD; it does not invoke eegproc's event-window reevaluation. Explicitly pass the intended annotation policy to downstream PSD/epoch functions. MNE documents this behavior in [Epochs](https://mne.tools/stable/generated/mne.Epochs.html).
 
@@ -161,7 +161,7 @@ Reports contain recording labels, source paths and acquisition metadata. Review 
 
 ## Synthetic example
 
-These figures were generated by the included [synthetic demo](../../examples/synthetic_demo.py) and [analysis script](../../examples/analyze_outputs.py), using generated signals rather than participant data. In the observed local example, ERP retained 17 of 18 events: standard 8/9 and target 9/9. A manual BAD annotation was deliberately included. This demonstrates file handling and trial accounting; it is not a denoising benchmark or evidence of biological effect size.
+The included [synthetic demo](../../examples/synthetic_demo.py) and [analysis script](../../examples/analyze_outputs.py) generate these figures from simulated signals to demonstrate file handling and trial accounting. With a deliberately added manual BAD annotation, the example retained 17 of 18 ERP events, with 8/9 standard and 9/9 target trials.
 
 ![PSD of the accepted synthetic resting output](../assets/synthetic_rest_psd.png)
 
@@ -169,4 +169,4 @@ The PSD example has visible simulated oscillatory peaks. The thin curves are ind
 
 ![Condition averages from the synthetic ERP output](../assets/synthetic_condition_erp.png)
 
-The ERP example shows Pz means and retained counts for both conditions. Different count and waveform shapes should be reported together; the plotted difference alone does not quantify recovery from a known clean ground truth.
+The ERP example shows Pz means and retained counts for both conditions. Report the counts with the waveform shapes. Measuring recovery would require a comparison with the clean ground truth.

@@ -4,7 +4,7 @@
 
 ## 1. 选择 Python 并创建环境
 
-完整功能推荐 **64 位 Python 3.12**。标准安装声明支持 Python >=3.11；可选 EEGPrep 0.4.0 要求 Python >=3.12。安装要求与实际完成的平台验证是两件事，已验证范围见[GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml)。
+完整功能推荐 **64 位 Python 3.12**。标准安装声明支持 Python >=3.11；可选 EEGPrep 0.4.0 要求 Python >=3.12。已验证的平台与组合见[GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml)。
 
 Windows PowerShell，已安装 Python 3.12 和 Python launcher 时：
 
@@ -23,7 +23,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-下面的安装命令由使用者执行，pip 会将所需依赖下载到指定环境。生成 HTML 报告不要求 GPU、MATLAB、EEGLAB 或桌面 Qt 界面库。环境配置原理见 [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)。
+运行以下安装命令时，pip 会将所需依赖下载到指定环境。生成 HTML 报告不要求 GPU、MATLAB、EEGLAB 或桌面 Qt 界面库。环境配置原理见 [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/)。
 
 ## 2. 安装 eegproc
 
@@ -49,7 +49,7 @@ python -m pip install "eegproc[eegprep,autoreject,device] @ git+https://github.c
 python -m pip install "eegproc @ git+https://github.com/LeiGuo0812/eegproc.git@REVISION"
 ```
 
-这是从 GitHub 安装，不等于从 PyPI 执行 `pip install eegproc`。语法见 [pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/)。
+以上命令通过 GitHub 安装。`pip install eegproc` 默认从 PyPI 查找。语法见 [pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/)。
 
 ### 下载 ZIP 或克隆源码
 
@@ -82,7 +82,7 @@ requirements 文件会安装本软件及依赖。应从仓库根目录执行，�
 python -m pip install eegproc-0.4.0a5-py3-none-any.whl
 ```
 
-依赖仍由 pip 解析下载。仅复制这个 wheel 到离线电脑并不足够，还需要全部依赖的安装包。
+pip 会解析并下载依赖。离线安装需同时准备这个 wheel 和全部依赖的安装包。
 
 ## 3. 验证安装
 
@@ -98,7 +98,7 @@ eegproc-report --help
 python -m pip check
 ```
 
-普通安装的 `eegproc.__file__` 应指向当前环境的 `site-packages`。在源码文件夹中导入成功，不能单独证明安装成功。如果命令行找不到 `eegproc`，请激活环境，或使用该环境解释器执行 `python -m eegproc`。
+验证普通安装时，确认 `eegproc.__file__` 指向当前环境的 `site-packages`。从源码文件夹导入时可能加载本地源码。如果命令行找不到 `eegproc`，请激活环境，或使用该环境解释器执行 `python -m eegproc`。
 
 接着运行[静息态示例](usage.md)。导入检查确认依赖可用；首次实际处理还会检查电极坐标、有效数据长度、信号秩和输入元数据。普通安装已包含 `epoch()`／`eegproc-epoch` 和 `render_report()`／`eegproc-report`，严格独立分段与延迟报告不需额外依赖，局部分段修复仍需 `autoreject` extra。
 
@@ -110,7 +110,7 @@ python -m pip check
 python -m pip freeze > environment.txt
 ```
 
-它记录当前安装环境，不是适用于所有平台的通用锁定文件。保留准备后的原始 FIF、完整 ICA 断点和报告。续处理会验证关键数值依赖和计算来源；升级相关软件后，旧断点可能不再兼容。
+`environment.txt` 记录当前环境中已安装的版本，适用于该平台和配置。保留准备后的原始 FIF、完整 ICA 断点和报告。续处理会验证关键数值依赖和计算来源；升级相关软件后，旧断点可能不再兼容。
 
 需要修改源码时，在仓库目录执行：
 
@@ -130,7 +130,7 @@ python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a5-py3-none-a
 python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a5-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
 ```
 
-请使用新的输出目录。`--existing-environment-check` 只用现有环境验证功能，不安装依赖，也不代表干净环境安装通过。实际完成情况以[GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml)和 GitHub Actions 的真实运行结果为准。
+请使用新的输出目录。`--existing-environment-check` 在现有环境中验证功能，复用已安装的依赖。干净环境安装由创建隔离环境的上述命令验证。实际验证结果见 [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml)。
 
 ## 常见问题
 
@@ -138,11 +138,11 @@ python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a5-py3-none-a
 |---|---|
 | `No module named eegproc` | 确认安装与运行使用同一 Python，查看 `python -m pip --version`。 |
 | Python 3.11 无法安装 EEGPrep | 使用 Python 3.12，或只安装不含该 extra 的标准流程。 |
-| pyEDFlib 要求编译器 | wheel 可用性取决于 Python、系统和架构。优先 Python 3.12，并查看 [0.1.42 文件列表](https://pypi.org/project/pyEDFlib/0.1.42/#files)。已有环境能运行不代表新环境一定有 wheel。 |
+| pyEDFlib 要求编译器 | wheel 可用性取决于 Python、系统和架构。优先 Python 3.12，并查看 [0.1.42 文件列表](https://pypi.org/project/pyEDFlib/0.1.42/#files)。检查目标 Python、系统和架构对应的 wheel。 |
 | 找不到命令 `eegproc` | 激活环境，或使用 `python -m eegproc`。 |
 | 缺少电极位置 | 在准备阶段修正名称、类型，并设置与实际采集一致的 montage。 |
 | 输出文件已存在 | 使用新的输出目录或 subject 标签，软件不会覆盖已有结果。 |
-| ICA 续处理提示不兼容 | 恢复匹配的软件环境、原始输入和完整断点，不要手动改哈希。 |
+| ICA 续处理提示不兼容 | 恢复匹配的软件环境、原始输入和完整断点，保留原哈希供校验。 |
 | 连续数据完成但没有分段文件 | 查看 **Summary → Parameter adjustments** 和 **Epochs**，区分事件缺失、时间窗无效和试次全部拒绝。 |
 
 eegproc 采用 [BSD 3-Clause 许可证](../../LICENSE)，保留的第三方条款见[第三方说明](../THIRD_PARTY_NOTICES.md)。

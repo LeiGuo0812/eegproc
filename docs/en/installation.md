@@ -23,7 +23,7 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 ```
 
-The commands in this tutorial are for the installing user. pip downloads required dependencies into that environment. A GPU, MATLAB, EEGLAB, or a desktop Qt backend is not required to create the HTML reports. General environment guidance: [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
+pip downloads the required dependencies into the virtual environment. A GPU, MATLAB, EEGLAB, or a desktop Qt backend is not required to create the HTML reports. General environment guidance: [Python Packaging User Guide](https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/).
 
 ## 2. Install eegproc
 
@@ -49,7 +49,7 @@ The default branch may change. For a study, replace `REVISION` below with the re
 python -m pip install "eegproc @ git+https://github.com/LeiGuo0812/eegproc.git@REVISION"
 ```
 
-This is a GitHub installation, not `pip install eegproc` from PyPI. See [pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/).
+Use the GitHub URL shown above to install eegproc. The bare `pip install eegproc` command searches PyPI. See [pip VCS support](https://pip.pypa.io/en/stable/topics/vcs-support/).
 
 ### Repository ZIP or Git checkout
 
@@ -72,7 +72,7 @@ Requirement files install this project as well as its dependencies. Run them fro
 | `requirements-all.txt` | All optional runtime backends | `python -m pip install ".[eegprep,autoreject,device]"` |
 | `requirements-dev.txt` | All runtime backends, tests, documentation/build tools | `python -m pip install ".[dev,eegprep,autoreject,device]"` |
 
-The default ASR implementation is shipped inside eegproc; it does not require EEGPrep or ASRpy. AutoReject is needed only for `repair_epochs=True`. Ordinary MNE file readers do not require the Neuracle extra. PyTorch is a standard dependency for ICLabel; generic pip installation can be large. CPU-specific PyTorch installation, when desired, should follow [PyTorch's platform selector](https://pytorch.org/get-started/locally/) before installing eegproc.
+eegproc bundles its default ASR implementation, which runs without EEGPrep or ASRpy. AutoReject is needed only for `repair_epochs=True`. Ordinary MNE file readers do not require the Neuracle extra. PyTorch is a standard dependency for ICLabel; generic pip installation can be large. CPU-specific PyTorch installation, when desired, should follow [PyTorch's platform selector](https://pytorch.org/get-started/locally/) before installing eegproc.
 
 ### Wheel
 
@@ -82,7 +82,7 @@ If a wheel is attached to a release, download the matching version and install t
 python -m pip install eegproc-0.4.0a5-py3-none-any.whl
 ```
 
-pip still resolves dependencies from the package index. Copying only a wheel to an offline computer is insufficient unless all required dependency wheels are also available.
+pip resolves dependencies from the package index. For an offline installation, bring the eegproc wheel and all required dependency wheels.
 
 ## 3. Verify the installation
 
@@ -98,7 +98,7 @@ eegproc-report --help
 python -m pip check
 ```
 
-For a regular installation, `eegproc.__file__` should be inside the active environment's `site-packages`. A source-directory import alone cannot verify installation. If the shell cannot find `eegproc`, activate the environment or use `python -m eegproc` with the environment's interpreter.
+Verify a regular installation by checking that `eegproc.__file__` points to the active environment's `site-packages`. Run the import outside the source directory to avoid importing the checkout. If the shell cannot find `eegproc`, activate the environment or use `python -m eegproc` with the environment's interpreter.
 
 Then run the [prepared-Raw example](usage.md#resting-state-recording). A successful import checks dependency availability; the first processing run also checks electrode coordinates, usable recording duration, signal rank and metadata. The normal installation includes `epoch()`/`eegproc-epoch` and `render_report()`/`eegproc-report`; strict standalone epoching and delayed reports need no additional dependency. Local epoch repair still requires the `autoreject` extra.
 
@@ -110,7 +110,7 @@ Save the installed versions alongside the study's code:
 python -m pip freeze > environment.txt
 ```
 
-This captures the current environment, not a universal cross-platform lock file. Keep the original prepared FIF and complete ICA checkpoint with their run report. Continuation checks numerical dependencies and computation provenance; upgrading a critical package can make a previous checkpoint incompatible.
+The snapshot captures the current environment and platform. Use it to document that installation. Keep the original prepared FIF and complete ICA checkpoint with their run report. Continuation checks numerical dependencies and computation provenance; upgrading a critical package can make a previous checkpoint incompatible.
 
 For source development, from the checkout:
 
@@ -130,7 +130,7 @@ python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a5-py3-none-a
 python scripts/validate_clean_install.py --wheel dist/eegproc-0.4.0a5-py3-none-any.whl --extras eegprep,autoreject,device --output validation/clean-all
 ```
 
-Choose a new output directory. `--existing-environment-check` tests the available environment without installation and explicitly does not establish clean-install support. Refer to the [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml) and actual GitHub Actions run results for completed checks.
+Choose a new output directory. `--existing-environment-check` tests the packages already installed in the active environment. Use the isolated validator to test clean installation. Refer to the [GitHub Actions](https://github.com/LeiGuo0812/eegproc/actions/workflows/tests.yml) and actual GitHub Actions run results for completed checks.
 
 ## Troubleshooting
 
@@ -138,7 +138,7 @@ Choose a new output directory. `--existing-environment-check` tests the availabl
 |---|---|
 | `No module named eegproc` | Use the same interpreter for pip and the script; inspect `python -m pip --version`. |
 | EEGPrep refuses Python 3.11 | Create a Python 3.12 environment, or install the standard workflow without this extra. |
-| pyEDFlib requires a compiler | Wheel availability depends on Python, OS and CPU. Prefer Python 3.12; inspect the [0.1.42 release files](https://pypi.org/project/pyEDFlib/0.1.42/#files). Do not infer clean support from a prepopulated environment. |
+| pyEDFlib requires a compiler | Wheel availability depends on Python, OS and CPU. Prefer Python 3.12; inspect the [0.1.42 release files](https://pypi.org/project/pyEDFlib/0.1.42/#files). Check a clean installation in an empty environment. |
 | CLI not found | Activate the environment, or run `python -m eegproc`. |
 | Missing electrode locations | Correct channel names/types and set the actual acquisition montage during preparation. |
 | Output already exists | Choose a new output directory or subject label. Outputs are protected from overwrite. |

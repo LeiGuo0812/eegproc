@@ -13,8 +13,8 @@ B = chr(96)
 
 # Name | constraint/unit | English | Chinese
 DESCRIPTIONS = """
-preset|standard / eeglab|Default parameter set within the same pipeline. Both request ICA training at 1–100 Hz; eeglab approximates selected original-script settings, not MATLAB numerical output.|同一流程的参数默认值；两者均请求 1–100 Hz ICA 训练，eeglab 近似对齐原脚本的部分设置，不代表 MATLAB 数值复现。
-purpose|rest / erp|Analysis defaults; does not itself enable epoch export.|分析目的默认值，不单独开启分段。
+preset|standard / eeglab|Default parameter set within the same pipeline. Both request 1–100 Hz for ICA training. The eeglab preset approximates selected settings from the original script. Numerical results can differ from MATLAB.|同一流程的参数默认值。两者均请求 1–100 Hz ICA 训练。eeglab 近似采用原脚本的部分设置，计算结果可能与 MATLAB 不同。
+purpose|rest / erp|Selects analysis defaults. Epoch export is configured separately.|选择分析默认值。分段输出单独设置。
 task_name|str / None; 1–100 characters|Task metadata, independent of purpose, filenames and event selection. No surrounding whitespace/control characters.|任务名称元数据，独立于 purpose、文件名和事件筛选；无首尾空格或控制字符。
 filter_method|mne_fir / eeglab_fir / off|Analysis/training FIR implementation; off skips explicit band filtering.|分析与训练数据的 FIR 实现；off 跳过显式带通滤波。
 filter_order|even int ≥ 2; samples|Used by eeglab_fir only; MNE FIR chooses its own length.|仅 eeglab_fir 使用；MNE FIR 自行确定滤波长度。
@@ -22,15 +22,15 @@ filter_position|after_reference|Currently the only supported filter position.|�
 highpass|Hz > 0; < lowpass|Analysis high-pass edge; limited by existing acquisition filtering.|分析高通边缘，受已有采集滤波限制。
 lowpass|Hz > highpass; < Nyquist|Analysis low-pass edge; may be clipped to input limits.|分析低通边缘，必要时根据输入限制下调。
 training_highpass|Hz > 0; < training_lowpass|ICA training high-pass edge; default 1 Hz in every preset. Explicit overrides are allowed; input-limit adjustments are recorded.|ICA 训练高通边缘；所有预设默认 1 Hz。允许显式覆盖，受输入限制产生的调整会记录。
-training_lowpass|Hz > training_highpass; < Nyquist|ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band cannot restore unavailable input frequencies.|ICA 训练低通边缘；所有预设默认 100 Hz。请求 1–100 Hz 无法恢复输入中不存在的频率。
+training_lowpass|Hz > training_highpass; < Nyquist|ICA training low-pass edge; default 100 Hz in every preset. The requested 1–100 Hz band is limited to frequencies retained in the input.|ICA 训练低通边缘，所有预设默认 100 Hz。请求的 1–100 Hz 频段受限于输入保留的频率。
 line_method|spectrum_fit / notch / off|Line-noise method; spectrum_fit uses MNE multitaper sinusoidal fitting.|工频方法；spectrum_fit 使用 MNE 多锥窗正弦拟合。
-line_frequency|Hz > 0 / None|Known mains frequency, normally 50 or 60; harmonics up to min(100, sfreq/2−1) Hz. None disables removal. Not an automatic estimator.|已知工频，通常为 50 或 60；处理不超过 min(100, sfreq/2−1) Hz 的谐波；None 关闭，不自动估计。
+line_frequency|Hz > 0 / None|Supply the known mains frequency, typically 50 or 60 Hz. Removal covers harmonics up to min(100, sfreq/2−1) Hz. None disables removal.|填入已知工频，通常为 50 或 60 Hz。处理不超过 min(100, sfreq/2−1) Hz 的谐波。None 关闭去工频。
 line_window_seconds|seconds > 0|spectrum_fit window. Unsupported DPSS settings reset to 4 s / 2 Hz; unusably short spans are reported.|spectrum_fit 窗长；不支持的 DPSS 组合恢复 4 秒 / 2 Hz；过短片段记录在报告。
 line_bandwidth|Hz > 0|Multitaper bandwidth; inactive for notch/off.|多锥窗带宽；notch/off 时不使用。
 line_p_value|0 < p < 1|spectrum_fit significance threshold; inactive for notch/off.|spectrum_fit 显著性阈值；notch/off 时不使用。
 channel_method|pyprep / eegprep / off|Bad-channel detector; eegprep needs an optional extra. Input bad channels remain relevant when off.|坏导检测器；eegprep 需可选依赖；off 仍保留输入坏导信息。
 flatline_seconds|seconds > 0|Flatline duration for the EEGPrep-compatible detector.|EEGPrep 兼容检测器的平直时长阈值。
-channel_correlation|0 < fraction < 1|EEGPrep-compatible correlation threshold; does not replace PyPREP internal settings.|EEGPrep 兼容相关阈值，不替代 PyPREP 内部参数。
+channel_correlation|0 < fraction < 1|Correlation threshold for the EEGPrep-compatible detector. PyPREP uses its internal settings.|EEGPrep 兼容检测器的相关阈值。PyPREP 使用自身设置。
 channel_broken_fraction|0 < fraction < 1|EEGPrep-compatible fraction of failed channel windows.|EEGPrep 兼容检测中异常窗口比例。
 detect_ransac|bool|PyPREP RANSAC switch; needs suitable electrode geometry/channel count.|PyPREP RANSAC 开关；需要合适的坐标与导联数量。
 reference|average / unchanged|Reference method for initial and enabled final reference; unchanged skips both.|初始及启用后的最终参考方法；unchanged 均不改变参考。
@@ -43,14 +43,14 @@ residual_qc|bool|Generate continuous BAD_residual annotations and residual diagn
 ica_enabled|bool|Enable ICA/ICLabel/application. False deactivates review/manual selection.|启用 ICA、ICLabel 与成分处理；False 时复核/人工选择失效。
 ica_mode|auto / review / manual|auto applies a proposal; review pauses before subtraction; manual applies a complete explicit list.|auto 应用建议；review 在减除前暂停；manual 应用完整人工列表。
 ica_exclude|tuple[int] / None; zero-based|Complete list; [] keeps all. Supplying a list in auto selects manual. Invalid/out-of-range indices are audited, never replaced with automatic choices.|完整删除列表，0 起始；[] 全保留；auto 下传列表会转 manual；无效或越界编号记录，不用自动建议替代。
-ica_rule|threshold / class_max|Automatic selection rule defined below; does not change ICA fitting.|自动筛选规则见下文；不改变 ICA 拟合。
+ica_rule|threshold / class_max|Selects the automatic rule for excluding fitted components. See the rules below.|选择拟合后自动剔除成分的规则，见下文。
 artifact_threshold|0.5 ≤ probability ≤ 1|threshold only: minimum maximum Muscle/Eye/Heart/Line/Channel probability.|仅 threshold：肌电/眼电/心电/工频/通道噪声中最高概率的最低要求。
 brain_probability_max|0 ≤ probability ≤ 0.5|threshold only: largest Brain probability allowed for removal.|仅 threshold：删除时允许的 Brain 概率上限。
 heart_min_ecg_correlation|0 ≤ absolute r ≤ 1|threshold only: extra AND gate for Heart-only candidates with a usable real ECG. Without ECG, use ICLabel alone.|仅 threshold：有真实可用 ECG 时对纯 Heart 候选增加 AND 相关门控；无 ECG 时仅用 ICLabel。
 ica_backend|mne|Supported ICA interface; solver is selected by ica_method.|支持的 ICA 接口；求解器由 ica_method 指定。
 ica_method|picard / infomax|Extended-Infomax objective with Picard or MNE Infomax solver.|使用 Picard 或 MNE Infomax 求解扩展 Infomax 目标。
 ica_max_iter|int ≥ 1|Iteration limit; limit/convergence diagnostics are reported.|最大迭代数；报告记录收敛和达到上限情况。
-ica_tolerance|positive|Picard tol or Infomax w_change; identical values need not mean identical stopping behavior.|Picard tol 或 Infomax w_change；相同数值不代表相同停止行为。
+ica_tolerance|positive|Tolerance for the selected solver: Picard tol or Infomax w_change. Each solver applies its own stopping criterion.|所选求解器的容差，Picard 使用 tol，Infomax 使用 w_change。两者各用自己的停止准则。
 rank_method|relative / covariance|relative: singular values > max(machine-precision tolerance, largest singular value × 1e-6). covariance: min(matrix_rank, covariance eigenvalues > 1e-7 µV²).|relative：奇异值大于 max(机器精度容差, 最大奇异值×1e-6)；covariance：矩阵秩与大于 1e-7 µV² 的协方差特征值数的较小值。
 review_author|str|Reviewer label for an initial manual decision.|初次人工决策复核人标签。
 review_reason|str|Reason for an initial manual decision.|初次人工决策理由。
@@ -58,10 +58,10 @@ asr_cutoff|positive / None|Burst cutoff; None disables ASR. Default 20 for both 
 asr_backend|mne_native|Independent MNE-compatible ASR; no runtime ASRpy dependency.|独立兼容 MNE 的 ASR；运行时不依赖 ASRpy。
 asr_options|dict / None|Advanced overrides below; cutoff/min_segment_seconds use top-level settings.|高级覆盖见下表；cutoff/min_segment_seconds 使用顶层参数。
 seed|int; 0 ≤ seed < 2**32|Random seed for ICA and applicable detection/repair stages.|ICA 与适用的检测/修复阶段的随机种子。
-n_threads|int ≥ 1|Numerical thread limit, not recording-level batch scheduling.|数值线程数，不自动调度记录级批处理。
+n_threads|int ≥ 1|Thread limit for numerical calculations. Set recording-level concurrency separately.|数值计算的线程上限。记录级并行数单独设置。
 bad_channel_fraction_limit|0 < fraction < 1|Global bad-channel quality threshold; policy determines reporting/stopping.|全局坏导比例质控阈值，由 policy 决定报告或停止。
 bad_channel_policy|auto / report / stop|report continues viable processing; stop rejects excess bad channels; auto resolves to report with the supported mne_native backend. At least 8 usable EEG channels remain required.|report 在仍可计算时跑完；stop 在坏导超限时停止；auto 对当前 mne_native 后端等于 report；始终要求至少 8 个可用 EEG 导联。
-min_training_seconds|seconds > 0|Minimum usable training and ASR segment duration; not proof of adequate calibration.|最短训练与 ASR 片段时长，不代表校准质量已充分。
+min_training_seconds|seconds > 0|Minimum usable training and ASR segment duration. Assess calibration quality separately.|训练与 ASR 片段的最短可用时长。校准质量需另行评估。
 gross_peak_uv|µV > 0|Absolute peak threshold for gross training artifacts.|严重训练伪迹绝对峰值阈值。
 residual_peak_uv|µV > 0|Residual absolute peak threshold, also the default epoch screen.|残留绝对峰值阈值，也是默认分段阈值。
 residual_ptp_uv|µV > 0|Residual peak-to-peak threshold, also the default epoch screen.|残留峰峰值阈值，也是默认分段阈值。
@@ -87,14 +87,14 @@ report_max_channels|int ≥ 2|Maximum displayed channels in representative wavef
 report_dpi|int ≥ 60; dpi|Raster resolution; larger values increase HTML size.|图片分辨率，越大则 HTML 越大。
 report_max_width|int ≥ 600; pixels|Maximum stored report figure width.|报告内图片最大像素宽度。
 report_psd_windows|int ≥ 1|Maximum representative windows for report PSD.|报告 PSD 抽取的代表性窗口数量上限。
-report_psd_window_seconds|seconds > 0 / None|None uses bounded automatic sampling. Report PSD is diagnostic, not a final analysis estimate.|None 使用内部有界抽样；报告 PSD 用于诊断，不是正式分析估计。
+report_psd_window_seconds|seconds > 0 / None|None sets the sampling window automatically within bounds. The report PSD uses sampled windows for quality review.|None 在规定范围内自动选取采样窗长度。报告中的 PSD 使用抽样窗进行质量检查。
 """
 
 ASR_DESCRIPTIONS = """
 cutoff|positive; use asr_cutoff|Burst cutoff, controlled at pipeline level.|爆发阈值，由顶层控制。
 reference_window|seconds > 0|Reference-selection window.|参考段筛选窗口。
 reference_max_bad_channels|0 ≤ fraction < 1|Maximum bad-channel fraction in reference windows.|参考窗口坏导比例上限。
-reference_tolerances|(lo, hi); lo < 0 < hi; lo can be -inf|Robust reference acceptance interval; supply -inf through Python rather than nonstandard JSON.|稳健参考段接收区间；-inf 用 Python 设置，避免非标准 JSON。
+reference_tolerances|(lo, hi); lo < 0 < hi; lo can be -inf|Robust reference acceptance interval. Use Python for -inf, which standard JSON cannot represent.|稳健参考段接收区间。标准 JSON 无法表示 -inf，请通过 Python 设置。
 calibration_window|seconds > 0|Calibration window.|校准窗口。
 overlap|0 ≤ fraction < 1|Reference/calibration window overlap.|参考与校准窗重叠比例。
 processing_window|seconds > 0 / None|Effective window=max(requested or 0.5, 1.5 × usable EEG channels / sfreq).|实际窗口=max(指定值或0.5, 1.5×可用EEG导联数/sfreq)。
@@ -153,7 +153,7 @@ All {count} PipelineConfig fields are listed below. Defaults are generated from 
 
 ## Configuration in Python
 
-Priority: **preset defaults < optional JSON file < config object/mapping < explicit run keywords**. A PipelineConfig is immutable and fully resolved: all its fields become explicit when passed as a base. Construct a new config to obtain a new purpose's defaults rather than changing only purpose on an existing config.
+Priority: **preset defaults < optional JSON file < config object/mapping < explicit run keywords**. A PipelineConfig is immutable and fully resolved: all its fields become explicit when passed as a base. Construct a new config with the desired purpose to use that purpose's defaults.
 """,
 "zh-CN": """# 参数参考
 
@@ -163,35 +163,35 @@ Priority: **preset defaults < optional JSON file < config object/mapping < expli
 
 ## Python 配置方法
 
-优先级：**预设默认值 < 可选 JSON 文件 < config 对象/字典 < run 显式关键字参数**。PipelineConfig 是完整解析后的不可变对象，作为配置源时全部字段均视为显式值。切换目的并重新获取默认值时，应新建配置，而不是只改已有配置的 purpose。
+优先级：**预设默认值 < 可选 JSON 文件 < config 对象/字典 < run 显式关键字参数**。PipelineConfig 是完整解析后的不可变对象，作为配置源时全部字段均视为显式值。用目标 purpose 新建配置，即可获得该用途的默认值。
 """}
 
 POLICY = {
 "en": """
 ## Corrections, dependencies and failure boundaries
 
-- Unknown fields are ignored; unsupported types, values and choices generally revert to the selected purpose/preset defaults. Every correction enters config.adjustments and the HTML parameter audit. An unreadable optional config file does not prevent using code parameters.
+- Unknown fields are ignored; unsupported types, values and choices generally revert to the selected purpose/preset defaults. Every correction enters config.adjustments and the HTML parameter audit. If the optional config file is unreadable, the code parameters still apply.
 - Bands are constrained by acquisition filtering and Nyquist. Removed frequencies are not restored; no implicit resampling occurs. At sfreq ≤80 Hz the current ASR backend is disabled; below 100 Hz the current ICA/ICLabel stage is disabled, with an audit.
 - Disabled ICA cancels review/manual selection. Review pauses without applying a final list. Malformed manual lists keep all components and require review; unavailable indices are omitted, including during resume. The complete effective exclusion list and changes are recorded. Checkpoint/input hashes and an imported selection JSON's model identity and reviewed=true remain strict requirements.
 - Disabling interpolation disables pre-ASR interpolation; disabling both locations disables the global switch. Inapplicable local epoch repair is disabled with an audit.
-- Missing/invalid events, unknown conditions, duplicate/out-of-range samples or impossible windows may skip epoch export while continuous processing completes. Inspect epoch_resolution and actual outputs. Continuous completion does not imply epoch export.
-- report quality policy is not a promise that every input succeeds. Missing inputs, output collisions, missing dependencies, invalid sampling/filter metadata, missing required coordinates, unusable samples/rank, and damaged/mismatched checkpoints can still stop processing. No guessed data replace such failures.
+- Missing/invalid events, unknown conditions, duplicate/out-of-range samples or impossible windows may skip epoch export while continuous processing completes. Check epoch_resolution and the output paths for the epoch export status.
+- With the report policy, processing continues after the bad-channel fraction exceeds its limit if viable. Missing inputs, output collisions, missing dependencies, invalid sampling/filter metadata, missing required coordinates, unusable samples/rank, and damaged or mismatched checkpoints can still stop processing. The pipeline reports these failures without substituting data.
 
 ## Exact ICA rules
 
-threshold: at least one of Muscle, Eye, Heart, Line noise and Channel noise reaches artifact_threshold AND Brain ≤ brain_probability_max. Other is not removed automatically. With a usable real ECG, Heart-only candidates also require maximum absolute Pearson correlation with an ECG channel ≥ heart_min_ecg_correlation. This is an additional AND gate, not independent ECG-only deletion. Without ECG, ICLabel alone is used; no ECG surrogate is constructed.
+threshold: at least one of Muscle, Eye, Heart, Line noise and Channel noise reaches artifact_threshold AND Brain ≤ brain_probability_max. Other is not removed automatically. With a usable real ECG, Heart-only candidates also require maximum absolute Pearson correlation with an ECG channel ≥ heart_min_ecg_correlation. ECG correlation is an additional condition for these candidates. If no usable ECG channel remains, ICLabel alone determines selection. The rule uses recorded ECG channels only.
 
 class_max: remove if Eye equals the maximum class probability; OR Brain ≤0.5 and any of Muscle, Line noise or Channel noise equals that maximum. Ties count. Heart/Other are not independently selected. artifact_threshold, brain_probability_max and ECG support are inactive.
 
 ## Epochs and BAD annotations
 
-purpose, task_name and epoch_mode are independent. Both rest and ERP default to continuous output. Explicit events passed to run activate event export when epoch_mode is none. auto QC uses trial-local screening for event epochs under either purpose, and continuous annotations for fixed epochs. Only local repair, not trial-local rejection, requires purpose=erp.
+purpose, task_name and epoch_mode are independent. Both rest and ERP default to continuous output. Explicit events passed to run activate event export when epoch_mode is none. auto QC uses trial-local screening for event epochs under either purpose, and continuous annotations for fixed epochs. Local repair requires purpose=erp.
 
 Event-window QC temporarily ignores only newly generated BAD_residual while checking actual event windows for peaks, peak-to-peak and relative noise. Original manual BAD, including pre-existing BAD_residual, still excludes overlapping trials. Continuous samples and annotations remain intact. Ordinary mne.Epochs(clean_raw, reject_by_annotation=True, ...) uses continuous BAD and may not match trial-local exports.
 
 ## Advanced ASR options
 
-Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the pipeline supplies cutoff and min_segment_seconds from asr_cutoff and min_training_seconds. Those two nested keys are ignored with an audit. Invalid nested keys/values use backend defaults. max_memory_mb also affects update boundaries, so it is not a purely cosmetic performance option.
+Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the pipeline supplies cutoff and min_segment_seconds from asr_cutoff and min_training_seconds. Those two nested keys are ignored with an audit. Invalid nested keys/values use backend defaults. Changing max_memory_mb can change update boundaries and numerical results.
 """,
 "zh-CN": """
 ## 依赖处理、自动修正与停止边界
@@ -200,24 +200,24 @@ Pass asr_options as a dictionary. Below are standalone ASRConfig defaults; the p
 - 频段受已有采集滤波与 Nyquist 限制；不恢复已丢失频率，不隐式重采样。采样率 ≤80 Hz 时停用当前 ASR；<100 Hz 时停用当前 ICA/ICLabel，均记录原因。
 - ICA 关闭则取消复核/人工选择；review 在减除前暂停；无效 manual 列表保留全部成分并要求复核，越界编号被去除，resume 也采用这一规则。完整生效列表与调整均被记录。断点/输入哈希，以及导入选择 JSON 的模型身份和 reviewed=true 仍严格校验。
 - 总插值关闭时不执行 ASR 前插值；两处插值均关闭时总开关也关闭。不适用的局部分段修复被关闭并记录。
-- 缺失或无效事件、未知条件、重复或越界样本、无法完成的事件窗可跳过分段并继续连续处理；检查 epoch_resolution 及实际输出，连续处理完成不代表已输出试次。
-- report 策略仅放宽质量阈值停止规则，不保证所有输入均成功。文件不存在、输出冲突、依赖缺失、无效采集元数据、缺失必要坐标、样本或秩不可用、断点损坏或身份不匹配仍可能停止，不会用猜测数据替代。
+- 缺失或无效事件、未知条件、重复或越界样本、无法完成的事件窗可跳过分段并继续连续处理；在 epoch_resolution 和输出路径中查看分段状态。
+- report 策略下，坏导比例超限后只要数据仍满足计算要求，流程就继续。文件不存在、输出冲突、依赖缺失、采样或滤波元数据无效、必要坐标缺失、样本或秩不可用、断点损坏或身份不匹配时仍可能停止。流程会报告实际错误，无替代数据。
 
 ## ICA 精确规则
 
-threshold：Muscle、Eye、Heart、Line noise、Channel noise 至少一类达到 artifact_threshold，并且 Brain ≤ brain_probability_max。Other 不自动删除。有可用真实 ECG 时，仅由 Heart 达标的候选还要求与至少一个 ECG 通道的最大绝对 Pearson 相关 ≥ heart_min_ecg_correlation。这是额外 AND 门控，不是单靠 ECG 独立删除。无 ECG 时仅按 ICLabel，不构造替代 ECG。
+threshold：Muscle、Eye、Heart、Line noise、Channel noise 至少一类达到 artifact_threshold，并且 Brain ≤ brain_probability_max。Other 不自动删除。有可用真实 ECG 时，仅由 Heart 达标的候选还要求与至少一个 ECG 通道的最大绝对 Pearson 相关 ≥ heart_min_ecg_correlation。ECG 相关性是这类候选的附加条件。没有可用 ECG 通道时，只按 ICLabel 筛选。ECG 辅助只使用实际采集的 ECG 通道。
 
 class_max：Eye 等于该 IC 最大类别概率时删除；或 Brain ≤0.5 且 Muscle、Line noise、Channel noise 中任意一类等于最高概率时删除。并列最高算匹配；不单独删除 Heart/Other；不使用 artifact_threshold、brain_probability_max 或 ECG 相关门控。
 
 ## 分段与 BAD
 
-purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续数据；向 run 传显式 events 会在 epoch_mode=none 时开启事件分段。auto QC 对两种 purpose 的事件分段均启用试次局部筛查，对固定窗使用连续标注排除；只有局部修复要求 purpose=erp，单纯试次局部排除不要求。
+purpose、task_name、epoch_mode 独立。rest 和 ERP 默认都仅输出连续数据；向 run 传显式 events 会在 epoch_mode=none 时开启事件分段。auto QC 对两种 purpose 的事件分段均启用试次局部筛查，对固定窗使用连续标注排除；局部修复要求 purpose=erp。
 
 事件窗 QC 仅暂时忽略本次新增 BAD_residual，按真实事件窗检查峰值、峰峰值与相对噪声。原始人工 BAD，包括原有同名 BAD_residual，仍排除重叠试次。连续数据及标注不因此删除。普通 mne.Epochs(clean_raw, reject_by_annotation=True, ...) 按连续 BAD 排除，不一定与本流程试次局部 QC 的导出结果相同。
 
 ## 高级 ASR 参数
 
-通过 asr_options 字典传入。下表为独立 ASRConfig 默认值；流程由 asr_cutoff、min_training_seconds 控制 cutoff、min_segment_seconds。后两个键若写入嵌套选项，会忽略并记录。无效键或值退回后端默认值。max_memory_mb 同时影响更新边界，并非纯性能开关。
+通过 asr_options 字典传入。下表为独立 ASRConfig 默认值；流程由 asr_cutoff、min_training_seconds 控制 cutoff、min_segment_seconds。后两个键若写入嵌套选项，会忽略并记录。无效键或值退回后端默认值。max_memory_mb 可影响更新边界和计算结果。
 """}
 
 API = {
@@ -236,7 +236,7 @@ API = {
 
 ## Reporting controls
 
-These are runtime arguments, not additional PipelineConfig fields. run, epoch and resume default to report=True, with HTML rendered in a fresh subprocess. report=False collects bounded numeric material and writes one *_report_data.npz without drawing or HTML. The eegproc collector does not actively import Agg/font rendering; upstream MNE may still import Matplotlib. Complete immediate reports remove temporary material/logs; partial or failed reports retain recovery material and a log. report_status is completed, partial, failed or deferred, independent of processing status. Rendering uses at most two 300-second attempts; render_report returns complete/partial HTML and raises on failure, while data-processing APIs preserve their result if only reporting fails. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default; keep_source_report=False deletes it only after a completed combined report, never for partial, failed or deferred delivery. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. The caller selects the correct report; no recording-identity matching is added.
+Pass these controls as runtime arguments. run, epoch and resume default to report=True, with HTML rendered in a fresh subprocess. report=False collects bounded numeric material and writes one *_report_data.npz without drawing or HTML. The eegproc collector does not actively import Agg/font rendering; upstream MNE may still import Matplotlib. Complete immediate reports remove temporary material/logs; partial or failed reports retain recovery material and a log. report_status is completed, partial, failed or deferred, independent of processing status. Rendering uses at most two 300-second attempts; render_report returns complete/partial HTML and raises on failure, while data-processing APIs preserve their result if only reporting fails. Epoch source reports are optional: missing/unreadable sources warn and processing continues. Source HTML is kept by default. With keep_source_report=False, the source is deleted after the combined report completes. Partial, failed and deferred reports leave the source in place. Report discovery is explicit path, then cleaned-FIF sibling HTML/package, then the Raw's saved path hint. Discovery uses file paths alone. The caller chooses the report that belongs to the recording.
 
 ## Complete CLI flags
 
@@ -257,7 +257,7 @@ Generated from the actual parser. Command: eegproc. Every config field is access
 
 ## 报告控制
 
-以下为运行参数，不增加 PipelineConfig 字段。run、epoch、resume 均默认 report=True，HTML 由全新子进程渲染。report=False 采集有限数值素材并写一个 *_report_data.npz，不绘图、不写 HTML。eegproc 采集模块不主动导入 Agg／字体渲染组件；MNE 自身仍可能导入 Matplotlib。完整即时报告清理临时素材和日志；部分完成或失败时保留恢复素材及日志。report_status 区分 completed、partial、failed、deferred，与处理状态分开。渲染最多尝试两次，每次 300 秒；render_report 对完整／部分 HTML 返回路径，失败时抛异常，数据处理 API 在仅报告失败时保留处理结果。epoch 的来源报告可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并报告 completed 后删除旧 HTML，部分、失败或延迟时保留。查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。由使用者选择对应报告，不新增记录身份匹配。
+以下选项通过运行参数传入。run、epoch、resume 均默认 report=True，HTML 由全新子进程渲染。report=False 采集有限数值素材并写一个 *_report_data.npz，不绘图、不写 HTML。eegproc 采集模块不主动导入 Agg／字体渲染组件；MNE 自身仍可能导入 Matplotlib。完整即时报告清理临时素材和日志；部分完成或失败时保留恢复素材及日志。report_status 区分 completed、partial、failed、deferred，与处理状态分开。渲染最多尝试两次，每次 300 秒；render_report 对完整／部分 HTML 返回路径，失败时抛异常，数据处理 API 在仅报告失败时保留处理结果。epoch 的来源报告可选，缺失／不可读时提醒并继续。默认保留原 HTML；keep_source_report=False 仅在新合并报告 completed 后删除旧 HTML，部分、失败或延迟时保留。查找顺序为显式路径、清理 FIF 同目录 HTML／报告包、Raw 保存的路径提示。查找依据为文件路径。由使用者选择与记录对应的报告。
 
 ## 全部 CLI 参数
 

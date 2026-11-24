@@ -2,7 +2,7 @@
 
 [首页](../../README.zh-CN.md) · [English](../en/analysis.md) · [使用示例](usage.md) · [结果解读](results.md)
 
-从人工接受的结果开始分析，将报告、实际参数和排除决定与分析代码一同保留。下面展示 MNE 的实际操作；频带、电极、时间窗和统计对比应由研究设计确定。流程跑完不能单独证明数据适合研究问题。
+按研究问题人工复核，从已接受的结果开始分析。将报告、实际参数和排除决定与分析代码一同保留。下面以 MNE 为例，频带、电极、时间窗和统计对比由研究设计确定。
 
 ## 先选对输出与分析方案
 
@@ -15,7 +15,7 @@
 | 源定位 | MNE 数据及头模型/电极位置 | 数字化坐标、配准、参考、秩、协方差 |
 | 群体统计 / 解码 | 每个受试者的结果或特征 | 独立统计单位、缺失、多重比较、验证拆分 |
 
-计划比较的记录尽量采用一致流程。两套参数都有科学理由时，可预先设置小规模敏感性分析比较结论，不要根据哪套更容易出现期望效应来选参数。
+计划比较的记录尽量采用一致流程。两套参数都有科学理由时，可在查看效应前确定参数，并安排小规模敏感性分析比较结论。
 
 ## 静息态功率谱与频带功率
 
@@ -54,7 +54,7 @@ spectrum.plot(average=True)
 
 相对 alpha 的含义由分母频带决定；把 1–40 Hz 改成别的范围，指标就变了。延长窗长会提高频率分辨率，但也可能减少可保留的完整片段。应同时考虑保留时长、平稳性和估计精度。谱对象和估计方法见 [MNE Spectrum 教程](https://mne.tools/stable/auto_tutorials/time-freq/10_spectrum_class.html)。
 
-直接从 Raw 计算 PSD 时，明确指定 `reject_by_annotation=True` 和适当估计参数。不要把不连续的有效样本直接拼成“连续信号”再滤波或普通 FFT，这会人为制造断点。
+直接从 Raw 计算 PSD 时，明确指定 `reject_by_annotation=True` 和适当估计参数。对有效片段分别滤波或做普通 FFT，避免拼接不连续样本时引入断点。
 
 ## ERP 检查与测量
 
@@ -82,9 +82,9 @@ mean_difference_uv = difference.get_data(picks=roi)[:, interval].mean() * 1e6
 print("Target-minus-standard ROI mean (µV):", mean_difference_uv)
 ```
 
-预先确定窗口中的平均幅度通常比逐个寻找最大峰更容易获得一致测量；这里的 300–600 ms 不是通用 P300 定义。检查基线、单试次分布、事件延迟、头皮分布及各条件样本量。参见 [MNE ERP 教程](https://mne.tools/stable/auto_tutorials/evoked/30_eeg_erp.html)及[分段可视化](https://mne.tools/stable/auto_tutorials/epochs/20_visualize_epochs.html)。
+预先确定窗口中的平均幅度通常比逐个寻找最大峰更容易获得一致测量。示例采用 300–600 ms，实际 P300 测量窗口按研究设计设定。检查基线、单试次分布、事件延迟、头皮分布及各条件样本量。参见 [MNE ERP 教程](https://mne.tools/stable/auto_tutorials/evoked/30_eeg_erp.html)及[分段可视化](https://mne.tools/stable/auto_tutorials/epochs/20_visualize_epochs.html)。
 
-试次数不等意味着精度可能不等，但不必对所有分析都自动丢弃试次凑平数量。根据估计量和对比需要决定是否平衡，并记录抽样种子。不要随意给已做基线校正的 epochs 再换一个基线而不说明原处理。
+试次数不等可能影响估计精度。根据估计量和对比需要决定是否平衡试次数，并记录抽样种子。若要为已校正的 epochs 更换基线，请注明原基线处理。
 
 ## 时频分析
 
@@ -113,15 +113,15 @@ power.crop(tmin=-0.8, tmax=1.0)
 power.plot(picks=["Cz"])
 ```
 
-这里最高分析频率低于默认 30 Hz 低通。周期数、留白和基线是示例选择，不是流程默认参数。这里先计算每个试次功率再平均，包含诱发及非锁相贡献；“先平均 ERP 再计算功率”是另一种量。若研究诱导功率，应明确其估计方法。参见 [MNE 频率/时频教程](https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html)。
+这里最高分析频率低于默认 30 Hz 低通。示例单独指定周期数、留白和基线。先计算每个试次功率再平均，得到含诱发及非锁相贡献的量。先平均 ERP 再计算功率则得到另一个量。若研究诱导功率，应明确其估计方法。参见 [MNE 频率/时频教程](https://mne.tools/stable/auto_tutorials/time-freq/20_sensors_time_frequency.html)。
 
 ![短模拟 epochs 的探索性时频展示](../assets/synthetic_time_frequency.png)
 
-这是另一个[脚本示例](../../examples/analyze_outputs.py)的输出，将所有保留的模拟试次在 Pz 汇总，显示相对基线功率的 log10 比值。它使用默认短 ERP 分段，主要演示绘图；边缘效应和短基线限制其科学解释。正式时频分析应采用上面代码一类留出边缘的较长 epochs。此图不是 target 与 standard 的条件差，也不是脑信号恢复验证。
+这是另一个[脚本示例](../../examples/analyze_outputs.py)的输出，将所有保留的模拟试次在 Pz 汇总，显示相对基线功率的 log10 比值。图中使用默认短 ERP 分段，演示跨试次汇总功率的绘图。边缘效应和短基线限制其科学解释。正式时频分析可采用上方示例中留有边缘的较长 epochs。图中汇总了两个条件的保留试次，未比较 target 与 standard 或验证脑信号恢复。
 
 ## 功能连接与源定位
 
-MNE-Connectivity 是独立的后续分析软件包，不是 eegproc 运行依赖。使用者可在分析环境中另行安装选定的兼容版本，再分析已接受的 EEG 片段：
+MNE-Connectivity 用于独立的后续分析。可在分析环境中另行安装选定的兼容版本，再分析已接受的 EEG 片段：
 
 ```python
 # 需要另行安装支持以下 API 的 mne-connectivity 版本。
@@ -135,25 +135,25 @@ connectivity = spectral_connectivity_epochs(
 matrix = connectivity.get_data(output="dense")
 ```
 
-此处 `epochs` 必须是计划分析的片段，例如前面的静息态 epochs，不能误用 notebook 中另一个条件留下的同名变量。应保留足够的平稳片段；片段时长也会改变谱估计。估计方法和假设见[官方 API](https://mne.tools/mne-connectivity/stable/generated/mne_connectivity.spectral_connectivity_epochs.html)。传感器连接仍受混合和参考影响；相位滞后指标不能单独证明解剖或因果连接。
+将 `epochs` 设为计划分析的片段，例如前面的静息态 epochs。在 notebook 中复用变量时，先核对条件。应保留足够的平稳片段；片段时长也会改变谱估计。估计方法和假设见[官方 API](https://mne.tools/mne-connectivity/stable/generated/mne_connectivity.spectral_connectivity_epochs.html)。传感器连接仍受混合和参考影响；相位滞后指标不能单独证明解剖或因果连接。
 
-源定位应保留真实电极坐标，考虑平均参考/插值造成的秩变化，并准备适当头模型、配准变换和噪声协方差。模板位置不等于个体数字化位置。上述内容不属于本预处理软件的自动输出，参见 [MNE 正向模型教程](https://mne.tools/stable/auto_tutorials/forward/30_forward.html)。
+源定位应保留个体数字化电极坐标，考虑平均参考/插值造成的秩变化，并另行准备适当头模型、配准变换和噪声协方差。参见 [MNE 正向模型教程](https://mne.tools/stable/auto_tutorials/forward/30_forward.html)。
 
 ## 群体统计与解码
 
-被试内对比应先在对齐通道和时间轴后，得到每个受试者的条件差。对受试者差值进行单样本置换检验可保留配对设计；不能把几千个试次当作几千个独立受试者。事先定义电极/时间/频率搜索范围和多重比较方法。簇显著支持簇级结论，不意味着簇中每个时间点都独立显著，也不能据此精确定位效应起点。参见 [MNE 统计推断](https://mne.tools/stable/auto_tutorials/stats-sensor-space/10_background_stats.html)及[单样本簇检验 API](https://mne.tools/stable/generated/mne.stats.permutation_cluster_1samp_test.html)。
+被试内对比应先在对齐通道和时间轴后，得到每个受试者的条件差。对受试者差值进行单样本置换检验可保留配对设计，统计独立单位为受试者。事先定义电极/时间/频率搜索范围和多重比较方法。簇显著支持簇级结论，不意味着簇中每个时间点都独立显著，也不能据此精确定位效应起点。参见 [MNE 统计推断](https://mne.tools/stable/auto_tutorials/stats-sensor-space/10_background_stats.html)及[单样本簇检验 API](https://mne.tools/stable/generated/mne.stats.permutation_cluster_1samp_test.html)。
 
-解码应按目标泛化单位拆分，例如受试者或会话。特征选择、标准化和学习型变换应在合适的训练折内拟合。整段预处理不能自动保证所有预测问题都不存在信息泄漏，应让预处理与验证方式符合真实使用场景。报告排除受试者、缺失条件、保留时长/试次分布及参数敏感性结果。
+解码应按目标泛化单位拆分，例如受试者或会话。特征选择、标准化和学习型变换应在合适的训练折内拟合。检查整段预处理是否符合实际预测场景，并在验证拆分中控制信息泄漏。报告排除受试者、缺失条件、保留时长/试次分布及参数敏感性结果。
 
 ## 改变目标滤波范围会怎样？
 
-流程先建立覆盖“分析频段和 ICA 训练频段”的共同频段，在其中进行 ASR，再得到分析和训练分支。因此改变分析频段不一定只影响最后图形：
+流程先建立覆盖“分析频段和 ICA 训练频段”的共同频段，在其中进行 ASR，再得到分析和训练分支。改变分析频段可能影响清理和质控：
 
 - 共同频段不变时，ASR 和 ICA 训练输入可能保持可比，但最终幅度、残留 QC 和试次保留仍可能变化。
 - 共同频段扩展或低频边界改变时，ASR 校准/重建和后续 ICA 也可能改变。
-- 两个频段均为 1–100 Hz 可省去一份全程分支，但也失去较低 ERP 高通对慢成分的保护。另一项模拟综合误差较低，不代表慢 ERP 成分一定保留。
+- 两个频段均为 1–100 Hz 可省去一份全程分支，但也失去较低 ERP 高通对慢成分的保护。另一项模拟的综合误差较低，慢 ERP 成分的保留情况仍需单独检查。
 - 提高低通以研究 gamma 会保留更多肌电/工频相关活动；降低低通后，被去掉的高频范围不能再用于分析。
 
-慢 ERP 成分应在提高高通前检查波形、基线和潜伏期影响。频谱分析应考虑滤波过渡带，不能把截止频率当作理想“刀切”边界。已经滤除的信息，后续再滤波无法恢复。参见 [MNE 滤波背景](https://mne.tools/stable/auto_tutorials/preprocessing/25_background_filtering.html)。
+慢 ERP 成分应在提高高通前检查波形、基线和潜伏期影响。频谱分析应考虑截止频率附近的滤波过渡带。已滤除的信息无法通过后续滤波恢复。参见 [MNE 滤波背景](https://mne.tools/stable/auto_tutorials/preprocessing/25_background_filtering.html)。
 
 比较候选参数时，保持**输入、事件列表、随机种子和预定 QC 规则一致**。同时跟踪有效时长/试次、局部坏导负担、残留伪迹和研究指标。保留各自报告，并在群体假设检验前明确主分析配置。

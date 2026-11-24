@@ -17,7 +17,7 @@ python examples/analyze_outputs.py --raw outputs/demo/rest/synthetic_cont_raw.fi
 python examples/analyze_outputs.py --epochs outputs/demo/erp/synthetic_clean-epo.fif --output analysis/demo_erp
 ```
 
-The first command creates a 60-second, 32-EEG-channel simulation with EOG/ECG/STIM, events and a manual BAD label. It exercises rest, ERP, review and continuation without dataset downloads. Its continuation reuses the automatic proposal to demonstrate the API; it is not a completed human review. The analysis commands generate exploratory PSD, ERP and time-frequency files in separate directories; these are example analysis products, not extra preprocessing attachments.
+The first command creates a 60-second, 32-EEG-channel simulation with EOG/ECG/STIM, events and a manual BAD label. It exercises rest, ERP, review and continuation without dataset downloads. To demonstrate the continuation API, the example uses the automatic proposal as the exclusion list. The downstream analysis commands write exploratory PSD, ERP and time-frequency files to separate directories.
 
 For real recordings, [code_first.py](../../examples/code_first.py) provides `rest`, `erp`, `review`, `manual`, `resume`, `config`, `prepare` and `render` subcommands. [batch_process.py](../../examples/batch_process.py) accepts a CSV manifest:
 
@@ -32,11 +32,11 @@ python examples/batch_process.py manifest.csv --output outputs/cohort --workers 
 python examples/batch_process.py manifest.csv --output outputs/cohort --workers 2 --resume
 ```
 
-Manifest paths are relative to the manifest, and each row receives its own `recording_0001/` directory. A parent supervisor starts a fresh Python process per recording, so an ordinary exception, unexpected worker exit or timeout does not break a reusable process pool or stop the remaining rows. `--workers` defaults to 1; start with one or two and measure peak memory. Each worker uses `n_threads=1`. `--timeout` defaults to 86400 seconds per recording; a timed-out worker and its report child processes are terminated together.
+Manifest paths are relative to the manifest, and each row receives its own `recording_0001/` directory. A parent supervisor starts a fresh Python process per recording. It records ordinary exceptions, unexpected worker exits and timeouts while the remaining rows continue. `--workers` defaults to 1; start with one or two and measure peak memory. Each worker uses `n_threads=1`. `--timeout` defaults to 86400 seconds per recording; a timed-out worker and its report child processes are terminated together.
 
-The worker saves EEG results and a small `batch_result.json` recovery record before rendering. `batch_summary.json` is updated atomically after each result, with processing and report status recorded separately. Successful rendering removes the batch-generated report package and worker log. Failed or partial rendering preserves material and logs, without turning completed EEG into a failed recording.
+The worker saves EEG results and a small `batch_result.json` recovery record before rendering. `batch_summary.json` is updated atomically after each result, with processing and report status recorded separately. Successful rendering removes the batch-generated report package and worker log. Failed or partial rendering preserves material and logs and leaves the EEG processing status intact.
 
-Use `--resume` with the **same manifest rows and output directory**. Completed reports are skipped; deferred, partial or failed reports are regenerated from their NPZ in a fresh target, without loading or reprocessing EEG. Previously failed scientific processing is recorded but not automatically repeated; resolve its cause and use a new output directory for a deliberate rerun. A directory with incomplete files but no recovery record is also left untouched. The batch command returns a nonzero exit code if any processing or report still needs attention. Ctrl+C stops active worker trees, cancels queued rows and saves the recovery summary.
+Use `--resume` with the **same manifest rows and output directory**. `--resume` skips completed reports and regenerates deferred, partial or failed reports from their NPZ at a new path without loading or reprocessing EEG. For a previous scientific processing failure, consult the recorded error, resolve its cause and rerun in a new output directory. A directory with incomplete files but no recovery record is also left untouched. The batch command returns a nonzero exit code if any processing or report still needs attention. Ctrl+C stops active worker trees, cancels queued rows and saves the recovery summary.
 
 The [synthetic demo](../../examples/synthetic_demo.py) and [downstream analysis script](../../examples/analyze_outputs.py) can also be imported/read as complete API examples.
 
@@ -69,11 +69,11 @@ raw = prepared.raw
 print(prepared.event_id)
 ```
 
-Only specify channel names present in your recording. Existing digitized positions can be retained by omitting `montage`; a template must not replace measured coordinates without a deliberate decision. The preparation function can also rename/drop channels. It applies no filter, rereference or artifact correction. With `output_fif`, it writes the prepared FIF, a `.preparation.json` provenance record and an `.events.json` event input. Without `return_result=True`, the return value is Raw rather than `PreparationResult`.
+Use channel names from your recording. Omit `montage` to retain measured positions, or specify a template when you intend to replace them. The preparation function can also rename/drop channels. It applies no filter, rereference or artifact correction. With `output_fif`, it writes the prepared FIF, a `.preparation.json` provenance record and an `.events.json` event input. Without `return_result=True`, the return value is Raw rather than `PreparationResult`.
 
-A Neuracle folder must contain the supported `data.bdf` and `evt.bdf` pair. Install the `device` extra for this adapter. The optional legacy calibration switch is for recordings with the documented vendor calibration convention, not a general amplitude adjustment.
+A Neuracle folder must contain the supported `data.bdf` and `evt.bdf` pair. Install the `device` extra for this adapter. Use the optional legacy calibration switch for recordings that follow the documented vendor calibration convention.
 
-For an array whose values are genuinely stored in µV:
+The following example reads an array stored in µV:
 
 ```python
 import numpy as np
@@ -87,7 +87,7 @@ raw.set_montage("standard_1020")
 raw.save("prepared/sub01_array_raw.fif", fmt="double", overwrite=False)
 ```
 
-This conversion is appropriate only when the array's units and channel order are known. A small channel array demonstrates input construction; the available channel count also constrains RANSAC, interpolation, ICA and event QC. Read runtime adjustments and quality observations.
+Verify the array's units and channel order before conversion. The small array illustrates input construction. The channel count constrains RANSAC, interpolation, ICA and event QC. Read runtime adjustments and quality observations.
 
 ## Resting-state recording
 
@@ -109,7 +109,7 @@ print(result.outputs)
 clean = result.raw
 ```
 
-The standard rest settings use an analysis band of 0.5–80 Hz, ICA training at 1–100 Hz, ASR cutoff 20, Picard, and threshold-based IC selection. Line frequency is explicitly supplied or defaults to 50 Hz; it is not automatically detected. Use 60 Hz for a known 60 Hz environment.
+The standard rest settings use an analysis band of 0.5–80 Hz, ICA training at 1–100 Hz, ASR cutoff 20, Picard, and threshold-based IC selection. Set the line frequency for the recording environment. The workflow uses 50 Hz unless you supply a different value, such as 60 Hz.
 
 `purpose="rest"` alone exports continuous data. To also create non-overlapping 2-second segments:
 
@@ -162,7 +162,7 @@ else:
 
 The standard ERP band is 0.1–30 Hz; ASR remains enabled at 20 and ICA is trained at 1–100 Hz. `purpose="erp"` does not by itself request epochs. Supplying `events` automatically requests event epochs when `epoch_mode` was `"none"`.
 
-Events are an integer array of shape `(n_events, 3)`, with increasing, unique **absolute MNE sample indices including `raw.first_samp`** in column 0 and integer condition codes in column 2. `event_id` maps condition names to codes, not descriptions to timestamps. Missing/invalid optional events are reported and epoch export is skipped while viable continuous processing continues. Inspect the report instead of assuming a file must exist.
+Events are an integer array of shape `(n_events, 3)`, with increasing, unique **absolute MNE sample indices including `raw.first_samp`** in column 0 and integer condition codes in column 2. `event_id` maps condition names to event codes. If optional events are missing or invalid, the run records why epoch export was skipped and continues viable continuous processing. Check the report for the epoch outcome.
 
 For a STIM channel, extract explicitly:
 
@@ -176,7 +176,7 @@ result = run(
 )
 ```
 
-Alternatively use `epoch_mode="events", event_source="stim", stim_channel="STI 014"`. In this release, `event_source="auto"` first tries annotations; a recording with only BAD annotations may produce an extraction error before STIM fallback. Explicit events or `event_source="stim"` avoids that ambiguity. For annotation-based epoching, use `event_source="annotations"` and `event_names` when selecting known names.
+Alternatively use `epoch_mode="events", event_source="stim", stim_channel="STI 014"`. In this release, `event_source="auto"` first tries annotations; a recording with only BAD annotations may produce an extraction error before STIM fallback. Use explicit events or `event_source="stim"` in that case. For annotation-based epoching, use `event_source="annotations"` and `event_names` when selecting known names.
 
 ### Event-window QC versus continuous BAD rejection
 
@@ -204,7 +204,7 @@ epochs = seg.epochs
 print(seg.status, seg.outputs)
 ```
 
-Select only actual stimulus conditions, not trial-end markers. Events use absolute MNE sample indices. Alternatively select names with `event_source="annotations", event_names=("1", "2")`, or use a real STIM channel with `event_source="stim", stim_channel="STI 014"`.
+Use stimulus onsets as the analysis events and leave trial-end markers out of the selection. Events use absolute MNE sample indices. Alternatively select names with `event_source="annotations", event_names=("1", "2")`, or use a real STIM channel with `event_source="stim", stim_channel="STI 014"`.
 
 ```python
 fixed = epoch(
@@ -217,13 +217,13 @@ fixed = epoch(
 
 New continuous FIFs retain minimal BAD-origin information and epoch settings. Original annotations and user extras are preserved. Input, manual and unknown BAD remain exclusions, including input annotations named `BAD_residual`. Event-window QC reevaluates only marked automatic residuals; annotation mode rejects all BAD overlaps. Legacy cleaned FIFs without source information use conservative handling and issue a warning. ICA checkpoint continuation, unlike standalone epoching, still requires the matching prepared input.
 
-`source_report=None` looks beside a loaded `*_cont_raw.fif` for a matching `*_report.html` or `*_report_data.npz`, then uses the preprocessing API's report-path hint. Pass `source_report="outputs/sub01/sub01_report.html"` to select a source explicitly. Missing or unreadable reports warn without preventing epoching. Existing figures and ICA diagnostics are reused; only the new epoch content is generated. Select the correct report: no recording-identity matching is performed.
+`source_report=None` looks beside a loaded `*_cont_raw.fif` for a matching `*_report.html` or `*_report_data.npz`, then uses the preprocessing API's report-path hint. Pass `source_report="outputs/sub01/sub01_report.html"` to select a source explicitly. Missing or unreadable reports warn without preventing epoching. Existing figures and ICA diagnostics are reused; only the new epoch content is generated. Choose the source report for the correct recording. The lookup uses file paths without checking recording identity.
 
 Source HTML is kept by default (`keep_source_report=True`). With `keep_source_report=False`, it is deleted only after the new combined HTML has `report_status="completed"`; partial, failed or deferred reports keep the source. Outputs are retained epoch FIF plus one HTML or report package; there are no QC JSON, image/table sidecars or copies of continuous Raw/ICA. Skipped or all-rejected requests are reported without writing an empty epoch file.
 
 ## Immediate and delayed reports
 
-`run()`, `epoch()` and `resume()` default to `report=True`. Processing first captures bounded diagnostic material, then a fresh Python subprocess renders HTML with numerical threads limited before import. `report=False` saves one `*_report_data.npz` without drawing or HTML. It contains representative before/after waveform windows, spectrum summaries, ICA diagnostics and QC records, not a full original recording. The eegproc material collector does not actively import Agg or font-rendering components; upstream MNE operations may independently import Matplotlib.
+`run()`, `epoch()` and `resume()` default to `report=True`. Processing first captures bounded diagnostic material, then a fresh Python subprocess renders HTML with numerical threads limited before import. `report=False` saves one `*_report_data.npz` without drawing or HTML. It contains representative before/after waveform windows, spectrum summaries, ICA diagnostics and QC records. The collector omits the full original recording and runs without importing Agg or font-rendering components. Upstream MNE operations may independently import Matplotlib.
 
 ```python
 from eegproc import run, epoch, render_report
@@ -248,11 +248,11 @@ render_report(
 )
 ```
 
-The target HTML must be new. Rendering does not repeat preprocessing or epoch QC. Stored diagnostics can be drawn later, but intervals that were never captured cannot be recovered. Existing HTML reuses embedded figures in the same isolated rendering path. The source remains unchanged.
+The target HTML must be new. Rendering does not repeat preprocessing or epoch QC. Deferred rendering uses the diagnostic intervals captured during the run. Existing HTML reuses embedded figures in the same isolated rendering path. The source remains unchanged.
 
-`report_status` is independent of `result.status`: `completed` means all applicable sections rendered; `partial` means HTML exists with missing sections or plotting errors; `failed` means rendering did not finish; `deferred` means HTML was intentionally postponed. Missing optional sections such as ICA when disabled do not count as errors. Inspect `result.report["report_status"]` after processing; do not use HTML availability as an EEG acceptance rule.
+`report_status` is independent of `result.status`: `completed` means all applicable sections rendered; `partial` means HTML exists with missing sections or plotting errors; `failed` means rendering did not finish; `deferred` means HTML was intentionally postponed. Missing optional sections such as ICA when disabled do not count as errors. Inspect `result.report["report_status"]` for report delivery and use the EEG quality findings for the acceptance decision.
 
-A renderer gets at most two fresh-process attempts, each limited to 300 seconds. Unexpected exits and timeouts are recorded in `report_execution`; incomplete delivery retains `outputs["report_data"]` and `outputs["report_log"]` for retry. Successfully completed immediate reports remove their temporary package and log. `render_report()` returns the path for complete or partial HTML and raises `RuntimeError` on rendering failure; `run()`, `epoch()` and `resume()` retain their processing result when only reporting fails. Retry a saved package to a new target. Process isolation protects the caller from a renderer exit; it cannot protect a computer from an operating-system crash.
+A renderer gets at most two fresh-process attempts, each limited to 300 seconds. Unexpected exits and timeouts are recorded in `report_execution`; incomplete delivery retains `outputs["report_data"]` and `outputs["report_log"]` for retry. Successfully completed immediate reports remove their temporary package and log. `render_report()` returns the path for complete or partial HTML and raises `RuntimeError` on rendering failure; `run()`, `epoch()` and `resume()` retain their processing result when only reporting fails. Retry a saved package to a new target. Process isolation contains renderer exits at the application level. An operating-system crash can still interrupt the run.
 
 A recording worker can briefly coexist with its report worker. Account for the extra memory and process startup time when choosing batch concurrency.
 
@@ -278,7 +278,7 @@ print(resolved.adjustments)
 
 When analysis and ICA training are both 1–100 Hz, the workflow shares the full-record band buffer. Temporary algorithm buffers and the compact training data may still be needed. Changing only the analysis band does not change the requested ICA training band.
 
-Both `standard` and `eeglab` request ICA training at **1–100 Hz**, for rest and ERP alike. `eeglab` retains its 0.5–100 Hz analysis default and its other alignment settings; its ICA training high-pass is 1 Hz rather than the original script's 0.5 Hz. Bad-channel detection uses the training-band copy, so it also uses 1–100 Hz by default. This follows [ICLabel's preprocessing guidance](https://mne.tools/mne-icalabel/stable/generated/examples/00_iclabel.html); bandwidth alone does not establish equivalence to all classifier training conditions.
+Both `standard` and `eeglab` request ICA training at **1–100 Hz**, for rest and ERP alike. `eeglab` retains its 0.5–100 Hz analysis default and its other alignment settings. Its ICA training high-pass is 1 Hz, compared with 0.5 Hz in the original script. Bad-channel detection uses the training-band copy, so it also uses 1–100 Hz by default. The ICA training band follows the frequency settings in [ICLabel's preprocessing guidance](https://mne.tools/mne-icalabel/stable/generated/examples/00_iclabel.html).
 
 `training_highpass` and `training_lowpass` can still be explicitly overridden. Input filter limits and Nyquist constraints take priority and are reported: a 1–100 Hz request cannot restore frequencies already removed or unavailable at acquisition. Existing ICA checkpoints retain their recorded training band; `resume()` reuses that decomposition. To replace an older 0.5 Hz fit with a 1 Hz fit, rerun preprocessing from the prepared Raw.
 
@@ -295,7 +295,7 @@ result = run(
 
 Priority is **preset defaults < explicit JSON file < configuration/mapping < keyword parameters**. Files are never discovered automatically. `None`, `False` and empty lists are explicit choices. Parameters are immutable; construct a new `PipelineConfig(purpose="erp")` when switching to ERP defaults. `dataclasses.replace()` retains other already-resolved values.
 
-Invalid values, unknown keys and dependency conflicts use audited fallback rules. Inspect `result.report["parameter_adjustments"]` and **Summary → Parameter adjustments** for the actual values. A fallback is not a reason to ignore a misspelled study setting. Invalid acquisition data, missing required dependencies, output collisions and numerical failures remain genuine errors.
+Invalid values, unknown keys and dependency conflicts use audited fallback rules. Inspect `result.report["parameter_adjustments"]` and **Summary → Parameter adjustments** for the actual values. Correct any misspelled study settings identified in the adjustments. Invalid acquisition data, missing required dependencies, output collisions and numerical failures remain genuine errors.
 
 ## IC selection rules
 
@@ -304,9 +304,9 @@ Invalid values, unknown keys and dependency conflicts use audited fallback rules
 | `threshold` (default) | At least one of Muscle/Eye/Heart/Line noise/Channel noise reaches `artifact_threshold=0.90`, and Brain is at most `brain_probability_max=0.20`. Other is not targeted. |
 | `class_max` | Eye equals the largest class probability; **or** Muscle/Line noise/Channel noise equals the maximum and Brain ≤0.50. Ties count. Heart and Other are not targeted by the original-script rule. |
 
-Under `threshold`, a Heart-only candidate with usable ECG also needs maximum absolute IC–ECG Pearson correlation ≥0.30 over valid training samples. Without usable ECG, ICLabel alone decides. The correlation is an additional requirement for those Heart candidates, not an independent mechanism that adds new candidates. There is no automatically constructed ECG proxy. ICs that independently pass another artifact category are not rescued by low ECG correlation.
+Under `threshold`, a Heart-only candidate with usable ECG also needs maximum absolute IC–ECG Pearson correlation ≥0.30 over valid training samples. Without usable ECG, ICLabel alone decides. The ECG rule screens existing Heart-only candidates, using the recorded ECG channel. A component that passes another artifact criterion remains eligible for exclusion regardless of ECG correlation.
 
-`class_max` uses the original script's category logic and does not use ECG assistance. Changing `artifact_threshold` under this rule does not change its category-maximum test. Review maps, spectra and activations rather than interpreting a class probability as proof of signal purity.
+`class_max` uses the original script's category logic and does not use ECG assistance. `artifact_threshold` does not affect the category-maximum test. Interpret the class probability alongside the component map, spectrum and activation.
 
 ## ICA review and continuation
 
@@ -337,7 +337,7 @@ revised = resume(
 )
 ```
 
-Changing a checkbox does not immediately modify a FIF or redraw the existing report. The downloaded JSON is a complete new exclusion list associated with that model. `resume()` applies it and produces a new result/report.
+Checkbox edits update the selection for that model. The downloaded JSON contains the complete new exclusion list. `resume()` applies it and creates a new result and report, leaving saved FIFs and the existing report in place.
 
 Choose a separate output directory that neither contains nor is contained by the original run directory. A new sibling directory works.
 
@@ -356,13 +356,13 @@ revised = resume(
 )
 ```
 
-If the previous list was `[1, 4, 7]`, the new list `[1, 4]` restores component 7. `exclude=[]` explicitly retains every component. Do not apply another ICA subtraction directly to the already-cleaned output if the intention is to restore an IC.
+If the previous list was `[1, 4, 7]`, the new list `[1, 4]` restores component 7. `exclude=[]` explicitly retains every component. Restore components from the pre-subtraction checkpoint.
 
 An initial manual run uses `ica_mode="manual", ica_exclude=[1, 4]`, provided those indices are intended for the new decomposition. Review mode is preferable when the decomposition has not yet been inspected.
 
-Continuation repeats reconstruction, final interpolation/reference, continuous QC, optional epochs and reporting. It does not refit ICA or repeat ICLabel, ASR, or filtering. Its frozen scientific parameters are restored from the checkpoint; changing those processing parameters requires a fresh run.
+Continuation uses the checkpoint's scientific parameters and reuses filtering, ASR, the ICA fit and ICLabel results. It repeats reconstruction, final interpolation and referencing, continuous QC, optional epochs and reporting. Start a fresh run to change the scientific parameters.
 
-Keep all three checkpoint files and the original prepared input. File-backed inputs can be reopened and identity-checked; relocated files use `original_fif=...`. In-memory inputs require the unchanged `original_raw=...`. Do not substitute a cleaned result or a different recording. Compatibility checks cover checkpoint schema, computation source and critical numerical dependencies; old checkpoints are accepted only through verified transitions.
+Keep all three checkpoint files and the original prepared input. File-backed inputs can be reopened and identity-checked; relocated files use `original_fif=...`. For in-memory inputs, pass the unchanged prepared recording as `original_raw=...`. Compatibility checks cover checkpoint schema, computation source and critical numerical dependencies; old checkpoints are accepted only through verified transitions.
 
 ## Batch processing and memory
 
@@ -400,7 +400,7 @@ eegproc-epoch --input-fif outputs/deferred/sub01_cont_raw.fif --save-path output
 eegproc-report --source outputs/epochs/sub01_report_data.npz --output outputs/epochs/sub01_report.html
 ```
 
-`python -m eegproc` uses the same preprocessing CLI. Rare settings can be supplied as `--set key=JSON`, for example `--set ica_max_iter=4096`. Preparation and preprocessing are separate commands. Prepared event JSON contains `{"events": [[sample, 0, code], ...], "event_id": {"condition": code}}`; this illustration is a schema, not literal valid JSON with ellipses. Select actual stimulus conditions rather than exporting trial-end markers as analysis events.
+`python -m eegproc` uses the same preprocessing CLI. Rare settings can be supplied as `--set key=JSON`, for example `--set ica_max_iter=4096`. Preparation and preprocessing are separate commands. The prepared event JSON follows `{"events": [[sample, 0, code], ...], "event_id": {"condition": code}}`. Replace the ellipsis with actual event rows. Select stimulus conditions for analysis and leave trial-end markers out.
 
 Rebuild the presentation from an existing HTML, or render a delayed package as shown above:
 
@@ -409,4 +409,4 @@ from eegproc import render_report
 render_report("outputs/rest/sub01_report.html", "outputs/rest/sub01_rebuilt_report.html")
 ```
 
-The target must be new. This reuses saved figures and diagnostics without signal reprocessing; it does not change scientific results, IC exclusions or the sampling windows already used for those figures.
+The target must be new. The rebuilt report uses the saved figures and diagnostics. The scientific results, IC exclusions and displayed sampling windows stay as recorded.
